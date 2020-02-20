@@ -1,0 +1,11 @@
+## Multicam Suite API Module
+VERSION DEV_1
+
+**Available commands**
+
+* VIDEO MIXER
+* AUDIO PROFILE
+* APPLICATION
+* COMPASER
+* RECORDING
+* CUSTOM COMMANDS
