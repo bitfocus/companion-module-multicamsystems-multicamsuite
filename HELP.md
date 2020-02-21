@@ -1,11 +1,12 @@
 ## Multicam Suite API Module
-VERSION DEV_1
 
 **Available commands**
 
+For the moment, the module is capable of
+
 * VIDEO MIXER
 * AUDIO PROFILE
-* APPLICATION
+* Start APPLICATION
 * COMPASER
-* RECORDING
+* RECORDING (Start or Stop)
 * CUSTOM COMMANDS
