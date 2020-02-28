@@ -9,4 +9,6 @@ For the moment, the module is capable of
 * Start APPLICATION
 * COMPASER
 * RECORDING (Start or Stop)
+* STREAMING (Start or Stop)
+* MEDIALIST (Start, Pause or Stop for media)
 * CUSTOM COMMANDS

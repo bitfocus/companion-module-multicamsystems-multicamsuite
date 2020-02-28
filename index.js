@@ -60,7 +60,7 @@ instance.prototype.config_fields = function() {
             id: 'info',
             width: 12,
             label: 'Information',
-            value: '<strong>PLEASE READ THIS!</strong>This module is intended for the owner of a multicam. Before you start, activate the multicam API in the settings <b>http://www.multicam-systems.com</b>'
+            value: '<strong>PLEASE READ THIS! </strong>This module is intended for the owner of a multicam. Before you start, activate the multicam API in the settings <b>http://www.multicam-systems.com</b>'
         },
         {
             type: 'textinput',
@@ -93,7 +93,8 @@ instance.prototype.actions = function(system) {
     self.setActions({
         'application': {
             label: 'Application',
-            options: [{
+            options: [
+                {
                     type: 'dropdown',
                     label: 'Select Start Application *',
                     id: 'Funcapplication',
@@ -117,16 +118,19 @@ instance.prototype.actions = function(system) {
         },
         'Audio': {
             label: 'Audio',
-            options: [{
+            options: [
+                {
                 type: 'textinput',
                 label: 'profile Name *',
                 id: 'FuncProfile',
                 default: 'Default',
-            }, ]
+                },
+            ]
         },
         'Composer': {
             label: 'Composer',
-            options: [{
+            options: [
+                {
                     type: 'textinput',
                     label: 'Composer file',
                     id: 'FuncFile',
@@ -142,25 +146,86 @@ instance.prototype.actions = function(system) {
         },
         'Recording': {
             label: 'Recording',
-            options: [{
-                type: 'dropdown',
-                label: 'Select Start Application *',
-                id: 'FuncRecord',
-                Default: 'start',
-                choices: [
-                    { id: 'start', label: 'Start' },
-                    { id: 'stop', label: 'Stop' },
-                ]
-            }, ]
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Recording *',
+                    id: 'FuncRecord',
+                    Default: 'start',
+                    choices: [
+                            { id: 'start', label: 'Start' },
+                            { id: 'stop', label: 'Stop' },
+                        ]
+                },
+            ]
         },
         'Video': {
             label: 'Video',
-            options: [{
-                type: 'textinput',
-                label: 'Select Source *',
-                id: 'FuncSource',
-                default: 'Source1'
-            }, ]
+            options: [
+                {
+                    type: 'textinput',
+                    label: 'Select Source *',
+                    id: 'FuncSource',
+                    default: 'Source1'
+                },
+            ]
+        },
+        'Streaming': {
+            label: 'Streaming',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Streaming *',
+                    id: 'FuncStream',
+                    Default: 'start',
+                    choices: [
+                        { id: 'start', label: 'Start' },
+                        { id: 'stop', label: 'Stop' },
+                    ]
+                },
+            ]
+        },
+        'Medialist': {
+            label: 'Medialist',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Media *',
+                    id: 'FuncMedialistAction',
+                    Default: 'start',
+                    choices: [
+                    { id: 'start', label: 'Start' },
+                    { id: 'stop', label: 'Stop' },
+                    { id: 'pause', label: 'Pause' },
+                    ]
+                }, 
+            ]
+        },
+        'Camera_Preset': {
+            label: 'Preset Cam',
+            options: [
+                {
+                    type: 'textinput',
+                    label: 'Camera Number*',
+                    id: 'FuncSource',
+                    default: '1'
+                },
+                {
+                    type: 'dropdown',
+                    label: 'Media *',
+                    id: 'FuncPresetCam',
+                    Default: 'Preset 1',
+                    choices: [
+                        { id: '1', label: 'Preset 1' },
+                        { id: '2', label: 'Preset 2' },
+                        { id: '3', label: 'Preset 3' },
+                        { id: '4', label: 'Preset 4' },
+                        { id: '5', label: 'Preset 5' },
+                        { id: '6', label: 'Preset 6' },
+                        { id: 'IA', label: 'Autoframe' },
+                    ]
+                },
+            ]
         },
         'Custom commands': {
             label: 'custom',
@@ -181,6 +246,7 @@ instance.prototype.action = function(action) {
     var cmd;
     var insert_cmd;
     var body;
+    var cmdValue
     
     switch (id) {
 
@@ -213,6 +279,24 @@ instance.prototype.action = function(action) {
             insert_cmd = `${opt.FuncFile}` ;
         break    
 
+        case 'Streaming':
+            insert_cmd = 'recording/' + `${opt.FuncStream}` ;
+        break
+
+        case 'Medialist':
+            insert_cmd = '/medialist/' + `${opt.FuncMedialistAction}` ;
+        break
+
+        case 'Camera_Preset':
+            if (opt.FuncPresetCam == "IA" ) {
+                insert_cmd = 'studio/autoframe?cameraIndex=' + `${opt.FuncSource}`;
+            }
+            else {
+                insert_cmd = '/studio/preset?cameraIndex=' + `${opt.FuncSource}` + '&presetIndex=' + `${opt.FuncPresetCam}`;
+            }
+        break      
+
+        
     }
 
     if (self.config.host.length > 0 && self.config.port.length > 0 ) {
@@ -223,13 +307,14 @@ instance.prototype.action = function(action) {
         self.log('error', 'Check your configuration ( ' + cmd + ' )');
     }
 
-    self.system.emit('rest', cmd, body, function (err, result) {
+    self.system.emit('rest', cmd, body, function (err, result, _feedbacks) {
         if (err !== null) {
             self.log('error', 'HTTP POST Request failed (' + result.error.code + ')');
             self.status(self.STATUS_ERROR, result.error.code);
         }
         else {
             self.status(self.STATUS_OK);
+            self.log('error', 'HTTP POST Request failed (' + `${_feedbacks}`  + ')');
         }
     })
 }
