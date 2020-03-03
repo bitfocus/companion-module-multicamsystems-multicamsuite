@@ -1,27 +1,27 @@
 {
-    "name": "multicam-suite",
-    "version": "1.0.0",
-    "api_version": "2.0.0",
-    "description": "API FOR MULTICAM SYSTEMS",
-    "keywords": [
-        "MCS",
-        "Multicam Systems",
-        "Vision Mixer",
-        "ptz",
-        "video"
-    ],
-    "main": "index.js",
-    "homepage": "https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite#readme",
-    "repository": {
+		"name": "multicamsystems-multicamsuite",
+		"version": "1.0.1",
+		"api_version": "2.0.0",
+		"description": "API FOR MULTICAM SYSTEMS",
+		"keywords": [
+				"MCS",
+				"Multicam Systems",
+				"Vision Mixer",
+				"ptz",
+				"video"
+		],
+		"main": "index.js",
+		"homepage": "https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite#readme",
+		"repository": {
 		"type": "git",
 		"url": "git+https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite.git"
 	},
-    "manufacturer": "Multicam Systems",
-    "product": "Multicam Suite",
-    "shortname": "MCS",
-    "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "author": "Vincent Berry <v.berry@multicam-systems.com>",
-    "license": "MIT"
+		"manufacturer": "Multicam Systems",
+		"product": "Multicam Suite",
+		"shortname": "MCS",
+		"scripts": {
+				"test": "echo \"Error: no test specified\" && exit 1"
+		},
+		"author": "Vincent Berry <v.berry@multicam-systems.com>",
+		"license": "MIT"
 }
