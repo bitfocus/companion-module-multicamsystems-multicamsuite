@@ -4,11 +4,10 @@
 		"api_version": "2.0.0",
 		"description": "API FOR MULTICAM SYSTEMS",
 		"keywords": [
-				"MCS",
 				"Multicam Systems",
 				"Vision Mixer",
 				"ptz",
-				"video"
+				"Video"
 		],
 		"main": "index.js",
 		"homepage": "https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite#readme",
