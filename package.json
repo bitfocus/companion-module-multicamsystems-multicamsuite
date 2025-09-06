@@ -1,28 +1,30 @@
 {
 	"name": "multicamsystems-multicamsuite",
-	"version": "1.0.2",
-	"api_version": "1.0.0",
-	"description": "API FOR MULTICAM SYSTEMS",
-	"keywords": [
-		"Vision Mixer",
-		"ptz",
-		"Video"
-	],
-	"main": "index.js",
-	"homepage": "https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite#readme",
+	"version": "2.0.0",
+	"main": "dist/main.js",
+	"type": "module",
+	"scripts": {
+		"format": "prettier -w .",
+		"package": "run build && companion-module-build",
+		"build": "rimraf dist && run build:main",
+		"build:main": "tsc -p tsconfig.build.json",
+		"dev": "tsc -p tsconfig.build.json --watch"
+	},
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite.git"
 	},
-	"manufacturer": "Multicam Systems",
-	"product": "Multicam Suite",
-	"shortname": "MCS",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+	"dependencies": {
+		"@companion-module/base": "~1.11.2"
 	},
-	"author": "Vincent Berry <v.berry@multicam-systems.com>",
-	"license": "MIT",
-	"bugs": {
-		"url": "https://github.com/bitfocus/companion-module-multicamsystems-multicamsuite/issues"
-	}
+	"devDependencies": {
+		"@companion-module/tools": "^2.1.1",
+		"@types/node": "^22.10.2",
+		"prettier": "^3.4.2",
+		"rimraf": "^6.0.1",
+		"typescript": "~5.5.4"
+	},
+	"prettier": "@companion-module/tools/.prettierrc.json",
+	"packageManager": "yarn@4.5.3"
 }
