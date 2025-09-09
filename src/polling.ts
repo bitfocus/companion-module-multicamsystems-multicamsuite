@@ -490,26 +490,26 @@ async function pollTitler(self: MulticamInstance) {
 						element.SpeakerEntries = elementSpeakerEntries
 
 						// Build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
-                        const tempSpeakerChoicesRows: any[] = []
+						const tempSpeakerChoicesRows: any[] = []
 
-                        for (const element of elementSpeakerEntries) {
-                            if (element.Entries && typeof element.Entries === 'object') {
-                                const entriesLabel = Object.entries(element.Entries)
-                                .map(([k, v]) => `${k}: ${v}`)
-                                .join(', ')
+						for (const element of elementSpeakerEntries) {
+							if (element.Entries && typeof element.Entries === 'object') {
+								const entriesLabel = Object.entries(element.Entries)
+									.map(([k, v]) => `${k}: ${v}`)
+									.join(', ')
 
-                                tempSpeakerChoicesRows.push({
-                                id: `${element.Id}_speaker`,
-                                label: entriesLabel,
-                                })
-                            } else {
-                                // fallback: no Entries
-                                tempSpeakerChoicesRows.push({
-                                id: `${element.Id}_speaker`,
-                                label: '(no entries)',
-                                })
-                            }
-                        }
+								tempSpeakerChoicesRows.push({
+									id: `${element.Id}_speaker`,
+									label: entriesLabel,
+								})
+							} else {
+								// fallback: no Entries
+								tempSpeakerChoicesRows.push({
+									id: `${element.Id}_speaker`,
+									label: '(no entries)',
+								})
+							}
+						}
 
 						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS) !== JSON.stringify(tempSpeakerChoicesRows)) {
 							self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = tempSpeakerChoicesRows
@@ -536,7 +536,7 @@ async function pollTitler(self: MulticamInstance) {
 					`/api/v2/titler/selected/elements/${element.Id}/panel/entries`,
 				)
 				if (elementPanelEntries) {
-                    console.log('log', elementPanelEntries)
+					console.log('log', elementPanelEntries)
 
 					if (elementPanelEntries.status && elementPanelEntries.status === 404) {
 						element.PanelEntries = []
@@ -552,23 +552,23 @@ async function pollTitler(self: MulticamInstance) {
 						//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
 						const tempPanelChoicesRows: any[] = []
 						for (const element of elementPanelEntries) {
-                            if (element.Entries && typeof element.Entries === 'object') {
-                                const entriesLabel = Object.entries(element.Entries)
-                                    .map(([k, v]) => `${k}: ${v}`)
-                                    .join(', ')
+							if (element.Entries && typeof element.Entries === 'object') {
+								const entriesLabel = Object.entries(element.Entries)
+									.map(([k, v]) => `${k}: ${v}`)
+									.join(', ')
 
-                                tempPanelChoicesRows.push({
-                                    id: `${element.Id}_panel`,
-                                    label: entriesLabel,
-                                })
-                            } else {
-                                // fallback: no Entries
-                                tempPanelChoicesRows.push({
-                                    id: `${element.Id}_panel`,
-                                    label: '(no entries)',
-                                })
-                            }
-                        }
+								tempPanelChoicesRows.push({
+									id: `${element.Id}_panel`,
+									label: entriesLabel,
+								})
+							} else {
+								// fallback: no Entries
+								tempPanelChoicesRows.push({
+									id: `${element.Id}_panel`,
+									label: '(no entries)',
+								})
+							}
+						}
 
 						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS) !== JSON.stringify(tempPanelChoicesRows)) {
 							self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = tempPanelChoicesRows
