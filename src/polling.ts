@@ -536,8 +536,6 @@ async function pollTitler(self: MulticamInstance) {
 					`/api/v2/titler/selected/elements/${element.Id}/panel/entries`,
 				)
 				if (elementPanelEntries) {
-					console.log('log', elementPanelEntries)
-
 					if (elementPanelEntries.status && elementPanelEntries.status === 404) {
 						element.PanelEntries = []
 						//log the error - .detail
