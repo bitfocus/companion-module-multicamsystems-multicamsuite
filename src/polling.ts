@@ -32,25 +32,26 @@ export function stopPolling(): void {
 }
 
 async function runPollCycle(self: MulticamInstance): Promise<void> {
-	try {
-		await pollApplication(self)
-		await pollAudio(self)
-		await pollConf(self)
-		await pollComposer(self)
-		await pollInsitu(self)
-		await pollMedialist(self)
-		await pollPublisher(self)
-		await pollRadio(self)
-		await pollRecording(self)
-		await pollScenes(self)
-		await pollStreaming(self)
-		await pollStudio(self)
-		await pollTitler(self)
-		await pollVideo(self)
-	} catch (err) {
+	//try {
+	await pollApplication(self)
+	await pollAudio(self)
+	await pollConf(self)
+	await pollComposer(self)
+	await pollInsitu(self)
+	await pollMedialist(self)
+	await pollPublisher(self)
+	await pollRadio(self)
+	await pollRecording(self)
+	await pollScenes(self)
+	await pollStreaming(self)
+	await pollStudio(self)
+	await pollTitler(self)
+	await pollVideo(self)
+	/*} catch (err) {
 		self.log('error', `Polling failed: ${err}`)
+		console.log('log', `${err}`)
 		stopPolling()
-	}
+	}*/
 }
 
 async function pollApplication(self: MulticamInstance) {
@@ -232,6 +233,10 @@ async function pollComposer(self: MulticamInstance) {
 			}
 		}
 
+		if (tempChoicesElements.length === 0) {
+			tempChoicesElements.push({ id: 'None', label: 'None' })
+		}
+
 		//only update if choices have changed
 		if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS) !== JSON.stringify(tempChoicesElements)) {
 			self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS = tempChoicesElements
@@ -365,6 +370,14 @@ async function pollScenes(self: MulticamInstance) {
 	//get selected scenes file content
 	const selectedSceneFileContent = await fetchData(self, '/api/v2/scenes/selected/scenes')
 	if (selectedSceneFileContent) {
+		if (selectedSceneFileContent.status && selectedSceneFileContent.status === 404) {
+			self.SCENES_FILE_SELECTED_SCENES = []
+			self.SCENES_FILE_SELECTED_SCENES = [{ Id: 'None', Name: 'None' }]
+			//log the error - .detail
+			self.log('debug', `Scenes file content error: ${selectedSceneFileContent.detail || 'Unknown error'}`)
+			return
+		}
+
 		self.SCENES_FILE_SELECTED_SCENES = selectedSceneFileContent
 
 		//build CHOICES_SCENES_FILE_SELECTED_SCENES
@@ -451,63 +464,97 @@ async function pollTitler(self: MulticamInstance) {
 
 		//loop through elements and grab each element's content via /api/v2/titler/selected/elements/{elementId}/speaker/entries
 		for (const element of selectedTitlerFileElements) {
-			const elementSpeakerEntries = await fetchData(
-				self,
-				`/api/v2/titler/selected/elements/${element.Id}/speaker/entries`,
-			)
-			if (elementSpeakerEntries) {
-				//append the speaker entries to the element object
-				element.SpeakerEntries = elementSpeakerEntries
-
-				//build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
-				const tempSpeakerChoicesRows: any[] = []
-				for (const row of elementSpeakerEntries) {
-					tempSpeakerChoicesRows.push({
-						id: `${element.Id}_speaker_${row.Id}`,
-						label: `${element.Name} - ${row.Entries.Titre || row.Id}`,
-					})
-				}
-
-				if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS) !== JSON.stringify(tempSpeakerChoicesRows)) {
-					self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = tempSpeakerChoicesRows
-					needsUpdate = true
-				}
+			if (self.config.verbose) {
+				self.log('debug', `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
 			}
 
-			//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/panel/entries/live
-			const elementLiveSpeakerRowId = await fetchData(
-				self,
-				`/api/v2/titler/selected/elements/${element.Id}/panel/entries/live`,
-			)
-			if (elementLiveSpeakerRowId) {
-				element.LiveSpeakerRowId = elementLiveSpeakerRowId.Id || ''
-			}
-
-			//get each element's panel entries via /api/v2/titler/selected/elements/{elementId}/panel/entries
-			const elementPanelEntries = await fetchData(self, `/api/v2/titler/selected/elements/${element.Id}/panel/entries`)
-			if (elementPanelEntries) {
-				//append the panel entries to the element object
-				element.PanelEntries = elementPanelEntries
-
-				//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
-				const tempPanelChoicesRows: any[] = []
-				for (const row of elementPanelEntries) {
-					tempPanelChoicesRows.push({ id: `${element.Id}_panel_${row.Id}`, label: row.Entries.Titre || row.Id })
+			if (element.ElementType == 'Speaker') {
+				if (self.config.verbose) {
+					self.log('debug', `Fetching speaker entries for element ${element.Id} (${element.Name})`)
 				}
 
-				if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS) !== JSON.stringify(tempPanelChoicesRows)) {
-					self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = tempPanelChoicesRows
-					needsUpdate = true
-				}
-			}
+				const elementSpeakerEntries = await fetchData(
+					self,
+					`/api/v2/titler/selected/elements/${element.Id}/speaker/entries`,
+				)
+				if (elementSpeakerEntries) {
+					if (elementSpeakerEntries.status && elementSpeakerEntries.status === 404) {
+						element.SpeakerEntries = []
+						//log the error - .detail
+						self.log(
+							'debug',
+							`Titler element speaker entries error for element ${element.Id}: ${elementSpeakerEntries.detail || 'Unknown error'}`,
+						)
+					} else {
+						//append the speaker entries to the element object
+						element.SpeakerEntries = elementSpeakerEntries
 
-			//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/panel/entries/live
-			const elementLivePanelRowId = await fetchData(
-				self,
-				`/api/v2/titler/selected/elements/${element.Id}/panel/entries/live`,
-			)
-			if (elementLivePanelRowId) {
-				element.LivePanelRowId = elementLivePanelRowId.Id || ''
+						//build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
+						const tempSpeakerChoicesRows: any[] = []
+						for (const row of elementSpeakerEntries) {
+							tempSpeakerChoicesRows.push({
+								id: `${element.Id}_speaker_${row.Id}`,
+								label: `${element.Name} - ${row.Entries.Titre || row.Id}`,
+							})
+						}
+
+						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS) !== JSON.stringify(tempSpeakerChoicesRows)) {
+							self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = tempSpeakerChoicesRows
+							needsUpdate = true
+						}
+					}
+				}
+
+				//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/speaker/entries/live
+				const elementLiveSpeakerRowId = await fetchData(
+					self,
+					`/api/v2/titler/selected/elements/${element.Id}/speaker/entries/live`,
+				)
+				if (elementLiveSpeakerRowId) {
+					element.LiveSpeakerRowId = elementLiveSpeakerRowId.Id || ''
+				}
+			} else if (element.ElementType == 'Panel') {
+				if (self.config.verbose) {
+					self.log('debug', `Fetching panel entries for element ${element.Id} (${element.Name})`)
+				}
+				//get each element's panel entries via /api/v2/titler/selected/elements/{elementId}/panel/entries
+				const elementPanelEntries = await fetchData(
+					self,
+					`/api/v2/titler/selected/elements/${element.Id}/panel/entries`,
+				)
+				if (elementPanelEntries) {
+					if (elementPanelEntries.status && elementPanelEntries.status === 404) {
+						element.PanelEntries = []
+						//log the error - .detail
+						self.log(
+							'debug',
+							`Titler element panel entries error for element ${element.Id}: ${elementPanelEntries.detail || 'Unknown error'}`,
+						)
+					} else {
+						//append the panel entries to the element object
+						element.PanelEntries = elementPanelEntries
+
+						//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
+						const tempPanelChoicesRows: any[] = []
+						for (const row of elementPanelEntries) {
+							tempPanelChoicesRows.push({ id: `${element.Id}_panel_${row.Id}`, label: row.Entries.Titre || row.Id })
+						}
+
+						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS) !== JSON.stringify(tempPanelChoicesRows)) {
+							self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = tempPanelChoicesRows
+							needsUpdate = true
+						}
+					}
+				}
+
+				//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/panel/entries/live
+				const elementLivePanelRowId = await fetchData(
+					self,
+					`/api/v2/titler/selected/elements/${element.Id}/panel/entries/live`,
+				)
+				if (elementLivePanelRowId) {
+					element.LivePanelRowId = elementLivePanelRowId.Id || ''
+				}
 			}
 		}
 
@@ -572,7 +619,7 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 
 			const raw = await response.text()
 
-			if (contentType.includes('application/json')) {
+			if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
 				return JSON.parse(raw)
 			} else {
 				return raw.trim()
