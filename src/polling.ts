@@ -174,7 +174,7 @@ async function pollComposer(self: MulticamInstance) {
 	if (files && files !== 'Application not launched!') {
 		self.COMPOSER_FILES = files
 
-		console.log('files', files)
+		//console.log('files', files)
 
 		//build CHOICES_COMPOSER_FILES
 		const choices = files.map((f: any) => {
@@ -200,6 +200,8 @@ async function pollComposer(self: MulticamInstance) {
 		self.COMPOSER_FILE_SELECTED = selectedFile.ComposerFileId
 		await updateVariable(self, 'composerSelectedFileName', selectedFile.ComposerFileName || '')
 		await updateVariable(self, 'composerSelectedFileId', selectedFile.ComposerFileId || '')
+		self.log('debug', `Selected composer file ID: ${selectedFile.ComposerFileId}`)
+		self.log('debug', `Selected composer file Name: ${selectedFile.ComposerFileName}`)
 	} else {
 		self.log('debug', 'Unable to fetch selected composer file, application not launched')
 	}
@@ -210,13 +212,19 @@ async function pollComposer(self: MulticamInstance) {
 		if (content !== 'No file selected!') {
 			self.COMPOSER_FILE_SELECTED_COMPOSITIONS = content
 
+			//console.log('content', content)
+
 			//build CHOICES_COMPOSER_COMPOSITIONS
 			const choices = content.map((c: any) => {
-				return { id: c.CompositionSceneId, label: c.CompositionSceneName }
+				return { id: c.ComposerSceneId, label: c.ComposerSceneName }
 			})
 			if (choices.length === 0) {
+				self.log('debug', 'No compositions found in selected composer file')
 				choices.push({ id: 'None', label: 'None' })
 			}
+
+			//console.log('CHOICES_COMPOSER_COMPOSITIONS:', choices)
+
 			//only update if choices have changed
 			if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS) !== JSON.stringify(choices)) {
 				self.CHOICES_COMPOSER_COMPOSITIONS = choices
@@ -227,22 +235,24 @@ async function pollComposer(self: MulticamInstance) {
 			//also build CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS
 			const tempChoicesElements: any[] = []
 			for (const composition of content) {
-				if (composition.Elements) {
+				//console.log('composition', composition)
+				if (composition.ComposerElements) {
 					for (const element of composition.ComposerElements) {
-						const id = `${composition.CompositionSceneId}_${element.Id}`
+						const id = `${composition.ComposerSceneId}_${element.Id}`
 						tempChoicesElements.push({
 							id,
-							label: `${composition.CompositionSceneName} - ${element.Name} (${element.Source})`,
+							label: `${composition.ComposerSceneName} - ${element.Name} (${element.Source})`,
 						})
 					}
 				}
 			}
 
 			if (tempChoicesElements.length === 0) {
+				self.log('debug', 'No composition elements found in selected composer file')
 				tempChoicesElements.push({ id: 'None', label: 'None' })
 			}
 
-			console.log('CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS:', tempChoicesElements)
+			//console.log('CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS:', tempChoicesElements)
 
 			//only update if choices have changed
 			if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS) !== JSON.stringify(tempChoicesElements)) {
@@ -495,6 +505,8 @@ async function pollTitler(self: MulticamInstance) {
 		self.TITLER_FILES = titlerFiles
 		self.checkFeedbacks()
 
+		console.log('titler files', titlerFiles)
+
 		//build temp array for CHOICES_TITLER_FILES, and then compare to existing array to see if we need to update
 		const tempChoicesFiles: any[] = []
 		for (const file of titlerFiles) {
@@ -514,6 +526,8 @@ async function pollTitler(self: MulticamInstance) {
 		//update name and id
 		await updateVariable(self, 'titlerSelectedFileName', selectedTitlerFile.Name || '')
 		await updateVariable(self, 'titlerSelectedFileId', selectedTitlerFile.Id || '')
+		self.log('debug', `Selected titler file ID: ${selectedTitlerFile.Id}`)
+		self.log('debug', `Selected titler file Name: ${selectedTitlerFile.Name}`)
 	} else {
 		await updateVariable(self, 'titlerSelectedFileName', 'None')
 		await updateVariable(self, 'titlerSelectedFileId', 'None')
@@ -547,10 +561,15 @@ async function pollTitler(self: MulticamInstance) {
 				self.log('debug', `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
 			}
 
+			self.log('debug', `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
+
 			if (element.ElementType == 'Speaker') {
 				if (self.config.verbose) {
 					self.log('debug', `Fetching speaker entries for element ${element.Id} (${element.Name})`)
 				}
+
+				// Build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
+				const tempSpeakerChoicesRows: any[] = []
 
 				const elementSpeakerEntries = await fetchData(
 					self,
@@ -568,33 +587,35 @@ async function pollTitler(self: MulticamInstance) {
 						//append the speaker entries to the element object
 						element.SpeakerEntries = elementSpeakerEntries
 
-						// Build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
-						const tempSpeakerChoicesRows: any[] = []
-
-						for (const element of elementSpeakerEntries) {
-							if (element.Entries && typeof element.Entries === 'object') {
-								const entriesLabel = Object.entries(element.Entries)
+						for (const entry of elementSpeakerEntries) {
+							if (entry.Entries && typeof entry.Entries === 'object') {
+								const entriesLabel = Object.entries(entry.Entries)
 									.map(([k, v]) => `${k}: ${v}`)
 									.join(', ')
 
 								tempSpeakerChoicesRows.push({
-									id: `${element.Id}_speaker`,
+									id: `${element.Id}_speaker_${entry.Id}`,
 									label: entriesLabel,
 								})
-							} else {
+							} /* else {
 								// fallback: no Entries
 								tempSpeakerChoicesRows.push({
 									id: `${element.Id}_speaker`,
 									label: '(no entries)',
 								})
-							}
-						}
-
-						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS) !== JSON.stringify(tempSpeakerChoicesRows)) {
-							self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = tempSpeakerChoicesRows
-							needsUpdate = true
+							}*/
 						}
 					}
+				}
+
+				//if tempSpeakerChoicesRows is empty, add a 'None' choice
+				if (tempSpeakerChoicesRows.length === 0) {
+					tempSpeakerChoicesRows.push({ id: 'None', label: 'None' })
+				}
+
+				if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS) !== JSON.stringify(tempSpeakerChoicesRows)) {
+					self.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = tempSpeakerChoicesRows
+					needsUpdate = true
 				}
 
 				//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/speaker/entries/live
@@ -609,6 +630,10 @@ async function pollTitler(self: MulticamInstance) {
 				if (self.config.verbose) {
 					self.log('debug', `Fetching panel entries for element ${element.Id} (${element.Name})`)
 				}
+
+				//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
+				const tempPanelChoicesRows: any[] = []
+
 				//get each element's panel entries via /api/v2/titler/selected/elements/{elementId}/panel/entries
 				const elementPanelEntries = await fetchData(
 					self,
@@ -626,32 +651,35 @@ async function pollTitler(self: MulticamInstance) {
 						//append the panel entries to the element object
 						element.PanelEntries = elementPanelEntries
 
-						//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
-						const tempPanelChoicesRows: any[] = []
-						for (const element of elementPanelEntries) {
-							if (element.Entries && typeof element.Entries === 'object') {
-								const entriesLabel = Object.entries(element.Entries)
+						for (const entry of elementPanelEntries) {
+							if (entry.Entries && typeof entry.Entries === 'object') {
+								const entriesLabel = Object.entries(entry.Entries)
 									.map(([k, v]) => `${k}: ${v}`)
 									.join(', ')
 
 								tempPanelChoicesRows.push({
-									id: `${element.Id}_panel`,
+									id: `${element.Id}_panel_${entry.Id}`,
 									label: entriesLabel,
 								})
-							} else {
+							} /* else {
 								// fallback: no Entries
 								tempPanelChoicesRows.push({
 									id: `${element.Id}_panel`,
 									label: '(no entries)',
 								})
-							}
-						}
-
-						if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS) !== JSON.stringify(tempPanelChoicesRows)) {
-							self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = tempPanelChoicesRows
-							needsUpdate = true
+							}*/
 						}
 					}
+				}
+
+				//if tempPanelChoicesRows is empty, add a 'None' choice
+				if (tempPanelChoicesRows.length === 0) {
+					tempPanelChoicesRows.push({ id: 'None', label: 'None' })
+				}
+
+				if (JSON.stringify(self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS) !== JSON.stringify(tempPanelChoicesRows)) {
+					self.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = tempPanelChoicesRows
+					needsUpdate = true
 				}
 
 				//get element speaker live row id via /api/v2/titler/selected/elements/{elementId}/panel/entries/live
