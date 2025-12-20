@@ -21,11 +21,11 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/application/start?applicationName=${action.options.applicationName}`)
+			await SendCommand(self, `/api/application/start?applicationName=${action.options.applicationName}`, 'POST')
 		},
 	}
 
-	actions.applicationStartWithTemplate = {
+	/*actions.applicationStartWithTemplate = {
 		name: 'APPLICATION | Start with Template',
 		description: 'Starts an application with a specified template.',
 		options: [
@@ -54,10 +54,10 @@ export function UpdateActions(self: MulticamInstance): void {
 			const { applicationName, templateName, waitEndOfInit } = action.options
 			await SendCommand(
 				self,
-				`/api/application/startWithTemplate/${applicationName}/${templateName}?waitEndOfInit=${waitEndOfInit}`,
+				`/api/application/startWithTemplate/${applicationName}/${templateName}?waitEndOfInit=${waitEndOfInit}`, 'POST'
 			)
 		},
-	}
+	}*/
 
 	actions.applicationStartWithRoom = {
 		name: 'APPLICATION | Start with Room',
@@ -89,18 +89,19 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(
 				self,
 				`/api/application/startWithRoom/${applicationName}/${roomId}?waitEndOfInit=${waitEndOfInit}`,
+				'POST',
 			)
 		},
 	}
 
-	actions.applicationRetryFailedStart = {
+	/*actions.applicationRetryFailedStart = {
 		name: 'APPLICATION | Retry Failed Start',
 		description: 'Retry an application which has failed to start.',
 		options: [],
 		callback: async () => {
 			await SendCommand(self, `/api/application/retryFailedStart`)
 		},
-	}
+	}*/
 
 	actions.applicationSetAutoMode = {
 		name: 'APPLICATION | Set Auto Mode',
@@ -118,7 +119,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/application/auto?isAutoMode=${action.options.isAutoMode}`)
+			await SendCommand(self, `/api/application/auto?isAutoMode=${action.options.isAutoMode}`, 'POST')
 		},
 	}
 
@@ -127,7 +128,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Toggle the auto/manual state of the application.',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/application/auto/toggle`)
+			await SendCommand(self, `/api/application/auto/toggle`, 'POST')
 		},
 	}
 
@@ -213,7 +214,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	actions.composerChangeElementSource = {
 		name: 'COMPOSER | Change Element Source',
-		description: 'Changes the compo element source.',
+		description: 'Changes the composition element source.',
 		options: [
 			{
 				type: 'dropdown',
@@ -432,31 +433,23 @@ export function UpdateActions(self: MulticamInstance): void {
 		callback: async (action) => {
 			await SendCommand(self, `/api/insitu/liveextract?start=${action.options.start}`, 'POST')
 		},
-	}
+	}*/
 
 	//MEDIALIST
-	actions.medialistCreate = {
-		name: 'Medialist - Create',
-		description: 'Creates a new Medialist',
-		options: [],
-		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist`)
-		},
-	}
-
 	actions.medialistSelect = {
 		name: 'Medialist - Select',
-		description: 'Select a Medialist by ID',
+		description: 'Select a Medialist',
 		options: [
 			{
-				type: 'textinput',
-				label: 'Medialist ID',
-				id: 'medialistId',
-				default: '',
+				type: 'dropdown',
+				label: 'Medialist',
+				id: 'medialist',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v3/medialist/selected/${action.options.medialistId}/select`, 'POST')
+			await SendCommand(self, `/api/v3/medialist/selected/${action.options.medialist}/select`, 'POST')
 		},
 	}
 
@@ -482,7 +475,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Plays the currently selected Medialist',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/play`)
+			await SendCommand(self, `/api/v3/medialist/selected/play`, 'POST')
 		},
 	}
 
@@ -491,7 +484,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Stops the currently selected Medialist',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/stop`)
+			await SendCommand(self, `/api/v3/medialist/selected/stop`, 'POST')
 		},
 	}
 
@@ -500,7 +493,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Pauses the currently selected Medialist',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/pause`)
+			await SendCommand(self, `/api/v3/medialist/selected/pause`, 'POST')
 		},
 	}
 
@@ -537,6 +530,8 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, `medialist/selected/${action.options.mediaId}/movedown`)
 		},
 	}
+
+	/*
 
 	//PUBLISHER
 	actions.publisherPublishRecording = {
@@ -995,7 +990,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Applies the shutdown action. This will stop all ongoing recordings, streamings and publishings.',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v1/system/shutdown`)
+			await SendCommand(self, `/api/v1/system/shutdown`, 'POST')
 		},
 	}
 
