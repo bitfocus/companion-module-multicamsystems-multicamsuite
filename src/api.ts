@@ -34,9 +34,7 @@ export async function InitConnection(self: MulticamInstance): Promise<void> {
 }
 
 function timeout(ms: number): Promise<never> {
-	return new Promise((_, reject) =>
-		setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
-	)
+	return new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms))
 }
 
 export async function SendCommand(
