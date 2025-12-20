@@ -10,27 +10,30 @@ This module will communicate with Multicam Systems' Multicam Suite software.
 
 ## Actions
 
-Application
+### Application
+
 Application - Start
-Application - Start with Template
 Application - Start with Room
-Application - Retry Failed Start
 Application - Set Auto Mode
 Application - Toggle Auto/Manual Mode
 
-Audio
+### Audio
+
 Audio - Select Audio Mixer Profile
 
-Camera
+### Camera
+
 Camera - Reset All
 Camera - Reset Camera
 
-Composer
+### Composer
+
 Composer - Select File
 Composer - Select Composition
 Composer - Change Element Source
 
-Conf
+### Conf
+
 Conf - Set Microphone Manual
 Conf - Set Wide Shot
 Conf - Set Microphones Auto
@@ -40,14 +43,16 @@ Conf - Set Current Preset Bank
 Conf - Set Autotitling State
 Conf - Reset Autotitling
 
-Insitu
+### Insitu
+
 Insitu - Activate Tag
 Insitu - Deactivate Tag
 Insitu - Activate Layout
 Insitu - Recall PTZ Preset
 Insitu - Start/Stop Live Extract
 
-Medialist
+### Medialist
+
 Medialist - Create
 Medialist - Select
 Medialist - Add Media
@@ -58,10 +63,12 @@ Medialist - Move Up (Selected)
 Medialist - Move Down (Selected)
 Medialist - Move to Index (Selected)
 
-Publisher
+### Publisher
+
 Publisher - Publish Recording
 
-Radio
+### Radio
+
 Radio - Set Manual Mic
 Radio - Wide Shot
 Radio - Enable Auto Mic
@@ -74,7 +81,8 @@ Radio - Set Automation Running
 Radio - Override Automation for Current Program
 Radio - Force Update Automation Variables
 
-Recording
+### Recording
+
 Recording - Start
 Recording - Start (Duration)
 Recording - Start (Tracking)
@@ -85,25 +93,30 @@ Recording - Start Aux
 Recording - Stop Aux
 Recording - Split
 
-Scenes
+### Scenes
+
 Scenes - Select Scene File
 Scenes - Take Scene
 
-Streaming
+### Streaming
+
 Streaming - Select Catalog
 Streaming - Start All Profiles
 Streaming - Stop All Profiles
 Streaming - Start Profile
 Streaming - Stop Profile
 
-Studio
+### Studio
+
 Studio - Store Preset
 Studio - Auto-Frame Camera
 
-System
+### System
+
 System - Shutdown
 
-Titler
+### Titler
+
 Titler - Set Titler File
 Titler - Take Element Live
 Titler - Set Speaker Row Live
@@ -122,7 +135,8 @@ Titler - Add Panel Entry
 Titler - Update All Panel Entries
 Titler - Set Ticker Content
 
-Video
+### Video
+
 Video - Change Live Source
 Video - Restart Video Output
 
