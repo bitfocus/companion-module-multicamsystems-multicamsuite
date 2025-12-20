@@ -29,7 +29,8 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_VIDEO_SOURCES: { id: string; label: string }[] = []
 
 	CHOICES_MEDIALIST_SELECTED_MEDIA: { id: string; label: string }[] = [] //choices for media in selected medialist
-	MEDIA_LISTS: any[] = [] //list of medialists
+	MEDIALISTS: any[] = [] //list of medialists
+	CHOICES_MEDIALISTS: { id: string; label: string }[] = [] //choices for medialists
 	MEDIALIST_SELECTED: any = {} //currently selected medialist
 	MEDIALIST_SELECTED_MEDIA: any[] = [] //media items in selected medialist
 	CHOICES_RADIO_PRESET_BANKS: { id: string; label: string }[] = [] //choices for radio preset banks
@@ -148,7 +149,11 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		this.updateFeedbacks() // export feedbacks
 		this.updateVariableDefinitions() // export variable definitions
 
-		await this.initConnection()
+		try {
+			await this.initConnection()
+		} catch (error) {
+			this.log('error', `Failed to initialize connection: ${error}`)
+		}
 	}
 	// When module gets deleted
 	async destroy(): Promise<void> {
@@ -158,7 +163,11 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
 
-		await this.initConnection()
+		try {
+			await this.initConnection()
+		} catch (error) {
+			this.log('error', `Failed to initialize connection: ${error}`)
+		}
 	}
 
 	// Return config fields for web config
