@@ -70,12 +70,10 @@ async function pollApplication(self: MulticamInstance) {
 		await updateVariable(self, 'licensedApps', licensedApps.join(', '))
 
 		//build CHOICES_APPLICATIONS
-		const choices = licensedApps.map((app: any) => {
-			return { id: app.name, label: app.name }
-		})
-		//update actions, feedbacks
-		if (choices.length === 0) {
-			choices.push({ id: 'None', label: 'None' })
+		//it is just a string array
+		const choices = []
+		for (const app of licensedApps) {
+			choices.push({ id: app, label: app })
 		}
 
 		//if no licensed apps, add 'None' choice
@@ -173,8 +171,10 @@ async function pollComposer(self: MulticamInstance) {
 
 	//get composer files
 	const files = await fetchData(self, '/api/v3/composer')
-	if (files) {
+	if (files && files !== 'Application not launched!') {
 		self.COMPOSER_FILES = files
+
+		console.log('files', files)
 
 		//build CHOICES_COMPOSER_FILES
 		const choices = files.map((f: any) => {
@@ -190,68 +190,82 @@ async function pollComposer(self: MulticamInstance) {
 			self.updateActions()
 			self.updateFeedbacks()
 		}
+	} else {
+		self.log('debug', 'Unable to fetch composer files, application not launched')
 	}
 
 	//get selected composer file
 	const selectedFile = await fetchData(self, '/api/v3/composer/selected')
-	if (selectedFile) {
+	if (selectedFile && selectedFile !== 'Application not launched!') {
 		self.COMPOSER_FILE_SELECTED = selectedFile.ComposerFileId
 		await updateVariable(self, 'composerSelectedFileName', selectedFile.ComposerFileName || '')
 		await updateVariable(self, 'composerSelectedFileId', selectedFile.ComposerFileId || '')
+	} else {
+		self.log('debug', 'Unable to fetch selected composer file, application not launched')
 	}
 
 	//get selected composer file's content
 	const content = await fetchData(self, '/api/v3/composer/selected/compositions')
-	if (content) {
-		self.COMPOSER_FILE_SELECTED_COMPOSITIONS = content
+	if (content && content !== 'Application not launched!') {
+		if (content !== 'No file selected!') {
+			self.COMPOSER_FILE_SELECTED_COMPOSITIONS = content
 
-		//build CHOICES_COMPOSER_COMPOSITIONS
-		const choices = content.map((c: any) => {
-			return { id: c.CompositionSceneId, label: c.CompositionSceneName }
-		})
-		if (choices.length === 0) {
-			choices.push({ id: 'None', label: 'None' })
-		}
-		//only update if choices have changed
-		if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS) !== JSON.stringify(choices)) {
-			self.CHOICES_COMPOSER_COMPOSITIONS = choices
-			self.updateActions()
-			self.updateFeedbacks()
-		}
+			//build CHOICES_COMPOSER_COMPOSITIONS
+			const choices = content.map((c: any) => {
+				return { id: c.CompositionSceneId, label: c.CompositionSceneName }
+			})
+			if (choices.length === 0) {
+				choices.push({ id: 'None', label: 'None' })
+			}
+			//only update if choices have changed
+			if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS) !== JSON.stringify(choices)) {
+				self.CHOICES_COMPOSER_COMPOSITIONS = choices
+				self.updateActions()
+				self.updateFeedbacks()
+			}
 
-		//also build CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS
-		const tempChoicesElements: any[] = []
-		for (const composition of content) {
-			if (composition.Elements) {
-				for (const element of composition.ComposerElements) {
-					const id = `${composition.CompositionSceneId}_${element.Id}`
-					tempChoicesElements.push({
-						id,
-						label: `${composition.CompositionSceneName} - ${element.Name} (${element.Source})`,
-					})
+			//also build CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS
+			const tempChoicesElements: any[] = []
+			for (const composition of content) {
+				if (composition.Elements) {
+					for (const element of composition.ComposerElements) {
+						const id = `${composition.CompositionSceneId}_${element.Id}`
+						tempChoicesElements.push({
+							id,
+							label: `${composition.CompositionSceneName} - ${element.Name} (${element.Source})`,
+						})
+					}
 				}
 			}
-		}
 
-		if (tempChoicesElements.length === 0) {
-			tempChoicesElements.push({ id: 'None', label: 'None' })
-		}
+			if (tempChoicesElements.length === 0) {
+				tempChoicesElements.push({ id: 'None', label: 'None' })
+			}
 
-		//only update if choices have changed
-		if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS) !== JSON.stringify(tempChoicesElements)) {
-			self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS = tempChoicesElements
-			self.updateActions()
-			self.updateFeedbacks()
+			console.log('CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS:', tempChoicesElements)
+
+			//only update if choices have changed
+			if (JSON.stringify(self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS) !== JSON.stringify(tempChoicesElements)) {
+				self.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS = tempChoicesElements
+				self.updateActions()
+				self.updateFeedbacks()
+			}
+		} else {
+			self.log('debug', 'Unable to fetch composer file elements, no file selected')
 		}
+	} else {
+		self.log('debug', 'Unable to fetch composer file content, application not launched')
 	}
 
 	//get selected composition
 	const composition = await fetchData(self, '/api/v3/composer/selected/compositions/selected')
-	if (composition) {
+	if (composition && composition !== 'Application not launched!') {
 		self.COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION = composition
 		self.COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION_ID = composition.CompositionSceneId || ''
 		await updateVariable(self, 'composerSelectedCompositionSceneName', composition.CompositionSceneName || '')
 		await updateVariable(self, 'composerSelectedCompositionSceneId', composition.CompositionSceneId || '')
+	} else {
+		self.log('debug', 'Unable to fetch selected composition, application not launched')
 	}
 }
 
@@ -319,7 +333,58 @@ async function pollInsitu(self: MulticamInstance) {
 }
 
 async function pollMedialist(self: MulticamInstance) {
-	self.log('info', 'Polling medialist - not yet implemented')
+	self.log('info', 'Polling Medialist')
+
+	//get available medialists
+	//api/v3/medialist
+
+	const medialists = await fetchData(self, '/api/v3/medialist')
+	if (medialists && medialists !== 'Application not launched!') {
+		self.MEDIALISTS = medialists
+
+		self.checkFeedbacks()
+
+		//build temp array for CHOICES_MEDIALISTS, and then compare to existing array to see if we need to update
+		const tempChoicesElements = medialists.map((m: any) => {
+			return { id: m.Id, label: m.Name }
+		})
+
+		if (tempChoicesElements.length === 0) {
+			tempChoicesElements.push({ id: 'None', label: 'None' })
+		}
+
+		//only update if choices have changed
+		if (JSON.stringify(self.CHOICES_MEDIALISTS) !== JSON.stringify(tempChoicesElements)) {
+			self.CHOICES_MEDIALISTS = tempChoicesElements
+			self.updateActions()
+			self.updateFeedbacks()
+		}
+	} else {
+		self.log('debug', 'Unable to fetch medialists, application not launched')
+	}
+
+	//get selected medialist
+	//api/v3/medialist/selected
+
+	const selectedMedialist = await fetchData(self, '/api/v3/medialist/selected')
+	if (selectedMedialist && selectedMedialist !== 'Application not launched!') {
+		self.MEDIALIST_SELECTED = selectedMedialist
+		await updateVariable(self, 'medialistSelectedName', selectedMedialist.Name || '')
+		await updateVariable(self, 'medialistSelectedId', selectedMedialist.Id || '')
+	} else {
+		self.log('debug', 'Unable to fetch selected medialist, application not launched')
+	}
+
+	//get selected media in selected medialist
+	//api/v3/medialist/selected/media
+
+	const selectedMedia = await fetchData(self, '/api/v3/medialist/selected/media')
+	if (selectedMedia && selectedMedia !== 'Application not launched!') {
+		self.MEDIALIST_SELECTED_MEDIA = selectedMedia
+		await updateVariable(self, 'medialistSelectedMedia', JSON.stringify(selectedMedia))
+	} else {
+		self.log('debug', 'Unable to fetch selected media, application not launched')
+	}
 }
 
 async function pollPublisher(self: MulticamInstance) {
@@ -339,7 +404,7 @@ async function pollScenes(self: MulticamInstance) {
 
 	//get scenes files
 	const sceneFiles = await fetchData(self, '/api/v2/scenes/files')
-	if (sceneFiles) {
+	if (sceneFiles && sceneFiles !== 'Application not launched!') {
 		self.SCENE_FILES = sceneFiles
 
 		//build CHOICES_SCENE_FILES
@@ -357,19 +422,23 @@ async function pollScenes(self: MulticamInstance) {
 			self.updateActions()
 			self.updateFeedbacks()
 		}
+	} else {
+		self.log('debug', 'Unable to fetch scene files, application not launched')
 	}
 
 	//get selected secenes file
 	const selectedSceneFile = await fetchData(self, '/api/v2/scenes/selected')
-	if (selectedSceneFile) {
+	if (selectedSceneFile && selectedSceneFile !== 'Application not launched!') {
 		self.SCENES_FILE_SELECTED = selectedSceneFile
 		await updateVariable(self, 'sceneSelectedFileName', selectedSceneFile.Name || '')
 		await updateVariable(self, 'sceneSelectedFileId', selectedSceneFile.Id || '')
+	} else {
+		self.log('debug', 'Unable to fetch selected scene file, application not launched')
 	}
 
 	//get selected scenes file content
 	const selectedSceneFileContent = await fetchData(self, '/api/v2/scenes/selected/scenes')
-	if (selectedSceneFileContent) {
+	if (selectedSceneFileContent && selectedSceneFileContent !== 'Application not launched!') {
 		if (selectedSceneFileContent.status && selectedSceneFileContent.status === 404) {
 			self.SCENES_FILE_SELECTED_SCENES = []
 			self.SCENES_FILE_SELECTED_SCENES = [{ Id: 'None', Name: 'None' }]
@@ -395,15 +464,19 @@ async function pollScenes(self: MulticamInstance) {
 			self.updateActions()
 			self.updateFeedbacks()
 		}
+	} else {
+		self.log('debug', 'Unable to fetch selected scene file content, application not launched')
 	}
 
-	//get selected sceneq
+	//get selected scene
 	const selectedScene = await fetchData(self, '/api/v2/scenes/selected/livescene')
-	if (selectedScene) {
+	if (selectedScene && selectedScene !== 'Application not launched!') {
 		self.SCENES_FILE_SELECTED_SCENE = selectedScene
 		self.SCENES_FILE_SELECTED_SCENE_ID = selectedScene.Id || ''
 		await updateVariable(self, 'sceneSelectedSceneName', selectedScene.Name || '')
 		await updateVariable(self, 'sceneSelectedSceneId', selectedScene.Id || '')
+	} else {
+		self.log('debug', 'Unable to fetch selected scene, application not launched')
 	}
 }
 
@@ -437,18 +510,24 @@ async function pollTitler(self: MulticamInstance) {
 
 	//get selected titler file
 	const selectedTitlerFile = await fetchData(self, '/api/v2/titler/selected')
-	if (selectedTitlerFile) {
+	if (selectedTitlerFile && selectedTitlerFile !== 'Application not launched!') {
 		//update name and id
 		await updateVariable(self, 'titlerSelectedFileName', selectedTitlerFile.Name || '')
 		await updateVariable(self, 'titlerSelectedFileId', selectedTitlerFile.Id || '')
 	} else {
 		await updateVariable(self, 'titlerSelectedFileName', 'None')
 		await updateVariable(self, 'titlerSelectedFileId', 'None')
+		self.log('debug', 'Unable to fetch selected titler file, application not launched')
 	}
 
 	//get selected titler file elements
 	const selectedTitlerFileElements = await fetchData(self, '/api/v2/titler/selected/elements')
-	if (selectedTitlerFileElements) {
+	if (selectedTitlerFileElements && selectedTitlerFileElements !== 'Application not launched!') {
+		if (selectedTitlerFileElements.status && selectedTitlerFileElements.status === 404) {
+			self.log('debug', 'No elements found for selected titler file')
+			return
+		}
+
 		let needsUpdate = false
 
 		//build temp array for CHOICES_TITLER_ELEMENTS, and then compare to existing array to see if we need to update
@@ -594,6 +673,8 @@ async function pollTitler(self: MulticamInstance) {
 		}
 
 		self.checkFeedbacks()
+	} else {
+		self.log('debug', 'Unable to fetch selected titler file elements, application not launched')
 	}
 }
 
