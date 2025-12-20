@@ -5,11 +5,14 @@ import { startPolling, stopPolling } from './polling.js'
 export async function InitConnection(self: MulticamInstance): Promise<void> {
 	self.updateStatus(InstanceStatus.Connecting, 'Connecting...')
 
-	try {
-		if (self.config.host && self.config.port) {
-			const cmd = `/api/application/version`
+	if (self.config.host && self.config.port) {
+		const cmd = `/api/application/version`
 
-			const results = await SendCommand(self, cmd)
+		try {
+			const results = await Promise.race([
+				SendCommand(self, cmd),
+				timeout(2000), // 2 second timeout
+			])
 
 			if (!results) {
 				self.updateStatus(InstanceStatus.ConnectionFailure, 'No response from Multicam')
@@ -17,16 +20,23 @@ export async function InitConnection(self: MulticamInstance): Promise<void> {
 				return
 			}
 
-			//if we get a version, let's start polling
 			self.updateStatus(InstanceStatus.Ok)
 			self.log('info', 'Connected successfully')
 			startPolling(self)
+		} catch (error: any) {
+			self.log('error', `Connection failed: ${error.message || error}`)
+			self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - check IP')
+			stopPolling()
 		}
-	} catch (error: any) {
-		self.log('error', `Connection failed: ${error.message || error}`)
-		self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - see log for details')
-		stopPolling()
+	} else {
+		self.updateStatus(InstanceStatus.BadConfig, 'Missing host or port')
 	}
+}
+
+function timeout(ms: number): Promise<never> {
+	return new Promise((_, reject) =>
+		setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+	)
 }
 
 export async function SendCommand(
