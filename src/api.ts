@@ -1,6 +1,7 @@
 import { InstanceStatus } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 import { startPolling, stopPolling } from './polling.js'
+import { InitSignalR } from './signalr.js'
 
 export async function InitConnection(self: MulticamInstance): Promise<void> {
 	self.updateStatus(InstanceStatus.Connecting, 'Connecting...')
@@ -23,6 +24,7 @@ export async function InitConnection(self: MulticamInstance): Promise<void> {
 			self.updateStatus(InstanceStatus.Ok)
 			self.log('info', 'Connected successfully')
 			startPolling(self)
+			InitSignalR(self)
 		} catch (error: any) {
 			self.log('error', `Connection failed: ${error.message || error}`)
 			self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - check IP')

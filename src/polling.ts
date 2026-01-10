@@ -5,6 +5,9 @@ let pollInterval: NodeJS.Timeout | undefined = undefined
 export function startPolling(self: MulticamInstance): void {
 	stopPolling()
 
+	//poll once
+	void runPollCycle(self)
+
 	const interval = Number(self.config.pollingInterval || 5000)
 
 	if (!interval || isNaN(interval)) {
