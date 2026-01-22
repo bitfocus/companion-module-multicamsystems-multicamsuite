@@ -5,6 +5,7 @@ import { UpdateActions } from './actions.js'
 import { UpdateFeedbacks } from './feedbacks.js'
 import { UpdateVariableDefinitions } from './variables.js'
 import { InitConnection } from './api.js'
+import type * as signalR from '@microsoft/signalr'
 
 export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	config!: ModuleConfig // Setup in init()
@@ -57,6 +58,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_TITLER_ELEMENTS_PANEL_ROWS: { id: string; label: string }[] = [] //choices for titler elements panel rows
 
 	pollInterval: NodeJS.Timeout | null = null
+	_signalR: signalR.HubConnection | null = null
 
 	constructor(internal: unknown) {
 		super(internal)
@@ -141,6 +143,8 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		this.CHOICES_TITLER_ELEMENTS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = [{ id: 'none', label: 'None' }] //default value
+
+
 	}
 
 	async init(config: ModuleConfig): Promise<void> {
