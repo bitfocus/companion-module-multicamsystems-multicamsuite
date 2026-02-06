@@ -143,8 +143,6 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		this.CHOICES_TITLER_ELEMENTS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = [{ id: 'none', label: 'None' }] //default value
-
-
 	}
 
 	async init(config: ModuleConfig): Promise<void> {
