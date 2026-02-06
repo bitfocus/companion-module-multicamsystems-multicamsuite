@@ -17,39 +17,11 @@ Application - Start with Room
 Application - Set Auto Mode
 Application - Toggle Auto/Manual Mode
 
-### Audio
-
-Audio - Select Audio Mixer Profile
-
-### Camera
-
-Camera - Reset All
-Camera - Reset Camera
-
 ### Composer
 
 Composer - Select File
 Composer - Select Composition
 Composer - Change Element Source
-
-### Conf
-
-Conf - Set Microphone Manual
-Conf - Set Wide Shot
-Conf - Set Microphones Auto
-Conf - Set Dynamism Level
-Conf - Enable Auto Frame Flow
-Conf - Set Current Preset Bank
-Conf - Set Autotitling State
-Conf - Reset Autotitling
-
-### Insitu
-
-Insitu - Activate Tag
-Insitu - Deactivate Tag
-Insitu - Activate Layout
-Insitu - Recall PTZ Preset
-Insitu - Start/Stop Live Extract
 
 ### Medialist
 
@@ -67,49 +39,10 @@ Medialist - Move to Index (Selected)
 
 Publisher - Publish Recording
 
-### Radio
-
-Radio - Set Manual Mic
-Radio - Wide Shot
-Radio - Enable Auto Mic
-Radio - Set AI Dynamism
-Radio - Enable Auto FrameFlow
-Radio - Set Preset Bank
-Radio - Auto Titling Toggle
-Radio - Reset Auto Titling
-Radio - Set Automation Running
-Radio - Override Automation for Current Program
-Radio - Force Update Automation Variables
-
-### Recording
-
-Recording - Start
-Recording - Start (Duration)
-Recording - Start (Tracking)
-Recording - Stop
-Recording - Pause/Resume
-Recording - Live Extract Toggle
-Recording - Start Aux
-Recording - Stop Aux
-Recording - Split
-
 ### Scenes
 
 Scenes - Select Scene File
 Scenes - Take Scene
-
-### Streaming
-
-Streaming - Select Catalog
-Streaming - Start All Profiles
-Streaming - Stop All Profiles
-Streaming - Start Profile
-Streaming - Stop Profile
-
-### Studio
-
-Studio - Store Preset
-Studio - Auto-Frame Camera
 
 ### System
 
@@ -135,13 +68,41 @@ Titler - Add Panel Entry
 Titler - Update All Panel Entries
 Titler - Set Ticker Content
 
-### Video
-
-Video - Change Live Source
-Video - Restart Video Output
-
 ## Feedbacks
+
+### Composer
+
+Composer - File is currently selected file
+Composer - Compostion is in currently selected comnposition
+
+### Scene
+
+Scene - File is currently selected file
+Scene - Scene is currently selected scene
+
+### Titler
+
+Titler - File is currently selected file
+Titler - Element is currently visible
+Titler - Element's selected speaker row is live
+Titler - Element's selected panel row is live
 
 ## Variables
 
-## Presets
+Computer Name
+Multicam Name
+Licensed Applications
+Application Version
+Running Application
+Application Auto/Manual State
+Application Snapshot
+Composer - Selected File Name
+Comnposer - Selected File ID
+Composer - Selected Composition Name
+Composer - Selected Composition ID
+Scene - Selected File Name
+Scene - Selected File ID
+Scene - Selected Scene Name
+Scene - Selected Scene ID
+Titler - Selected File Name
+Titler - Selected File ID
