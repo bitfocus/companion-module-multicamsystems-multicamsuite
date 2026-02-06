@@ -150,7 +150,7 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 	//element is currently visible
 	feedbacks.titlerElementVisible = {
 		type: 'boolean',
-		name: 'Element is currently visible',
+		name: 'TITLER | Element is currently visible',
 		description: 'If the chosen element is currently visible, change color',
 		options: [
 			{
@@ -179,7 +179,7 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 	//element's selected speaker row is live
 	feedbacks.titlerElementSpeakerRowLive = {
 		type: 'boolean',
-		name: "Element's selected speaker row is live",
+		name: "TITLER | Element's selected speaker row is live",
 		description: "If the chosen element's selected speaker row is live, change color",
 		options: [
 			{
@@ -212,7 +212,7 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 	//element's selected panel row is live
 	feedbacks.titlerElementPanelRowLive = {
 		type: 'boolean',
-		name: "Element's selected panel row is live",
+		name: "TITLER | Element's selected panel row is live",
 		description: "If the chosen element's selected panel row is live, change color",
 		options: [
 			{
