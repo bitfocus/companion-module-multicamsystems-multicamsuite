@@ -143,7 +143,7 @@ async function pollApplication(self: MulticamInstance) {
 
 async function pollAudio(self: MulticamInstance) {
 	//get audio profiles
-	self.log('info', 'Polling audio profiles')
+	//self.log('info', 'Polling audio profiles')
 
 	/*const profiles = await fetchData(self, '/api/v1/audio/profiles')
 	if (profiles) {
@@ -284,7 +284,7 @@ async function pollComposer(self: MulticamInstance) {
 }
 
 async function pollConf(self: MulticamInstance) {
-	self.log('info', 'Polling Conf')
+	//self.log('info', 'Polling Conf')
 
 	//get workspace information
 	/*const workspace = await fetchData(self, '/api/v2/conf/workspace')
@@ -330,7 +330,7 @@ async function pollConf(self: MulticamInstance) {
 }
 
 async function pollInsitu(self: MulticamInstance) {
-	self.log('info', 'Polling Insitu')
+	//self.log('info', 'Polling Insitu')
 	/*
     //get tags
     const tags = await fetchData(self, '/api/insitu/tags')
@@ -402,15 +402,15 @@ async function pollMedialist(self: MulticamInstance) {
 }
 
 async function pollPublisher(self: MulticamInstance) {
-	self.log('info', 'Polling publisher - not yet implemented')
+	//self.log('info', 'Polling publisher - not yet implemented')
 }
 
 async function pollRadio(self: MulticamInstance) {
-	self.log('info', 'Polling radio - not yet implemented')
+	//self.log('info', 'Polling radio - not yet implemented')
 }
 
 async function pollRecording(self: MulticamInstance) {
-	self.log('info', 'Polling recording - not yet implemented')
+	//self.log('info', 'Polling recording - not yet implemented')
 }
 
 async function pollScenes(self: MulticamInstance) {
@@ -495,11 +495,11 @@ async function pollScenes(self: MulticamInstance) {
 }
 
 async function pollStreaming(self: MulticamInstance) {
-	self.log('info', 'Polling streaming - not yet implemented')
+	//self.log('info', 'Polling streaming - not yet implemented')
 }
 
 async function pollStudio(self: MulticamInstance) {
-	self.log('info', 'Polling studio - not yet implemented')
+	//self.log('info', 'Polling studio - not yet implemented')
 }
 
 async function pollTitler(self: MulticamInstance) {
@@ -711,7 +711,7 @@ async function pollTitler(self: MulticamInstance) {
 }
 
 async function pollVideo(self: MulticamInstance) {
-	self.log('info', 'Polling video - not yet implemented')
+	//self.log('info', 'Polling video - not yet implemented')
 }
 
 export async function updateVariable(self: MulticamInstance, varName: string, value: any) {
