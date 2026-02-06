@@ -8,16 +8,17 @@ export function startPolling(self: MulticamInstance): void {
 	//poll once
 	void runPollCycle(self)
 
-	const interval = Number(self.config.pollingInterval || 5000)
-
-	if (!interval || isNaN(interval)) {
-		self.log('error', 'Invalid polling interval in config')
-		return
-	}
+	let interval = 30000
 
 	if (!self.config.enablePolling) {
-		self.log('info', 'Polling is disabled in config')
-		return
+		self.log('info', 'Polling is disabled in config; will poll every 30 seconds instead')
+	} else {
+		interval = Number(self.config.pollingInterval || 5000)
+
+		if (!interval || isNaN(interval)) {
+			self.log('error', 'Invalid polling interval in config')
+			return
+		}
 	}
 
 	self.pollInterval = setInterval(() => {
@@ -508,7 +509,7 @@ async function pollTitler(self: MulticamInstance) {
 		self.TITLER_FILES = titlerFiles
 		self.checkFeedbacks()
 
-		console.log('titler files', titlerFiles)
+		//console.log('titler files', titlerFiles)
 
 		//build temp array for CHOICES_TITLER_FILES, and then compare to existing array to see if we need to update
 		const tempChoicesFiles: any[] = []
