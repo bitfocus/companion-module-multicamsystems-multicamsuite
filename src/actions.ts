@@ -438,7 +438,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	//MEDIALIST
 	actions.medialistSelect = {
-		name: 'Medialist - Select',
+		name: 'MEDIALIST | Select',
 		description: 'Select a Medialist',
 		options: [
 			{
@@ -455,7 +455,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistAddMedia = {
-		name: 'Medialist - Add Media',
+		name: 'MEDIALIST | Add Media',
 		description: 'Adds a media to the selected Medialist',
 		options: [
 			{
@@ -472,7 +472,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistPlay = {
-		name: 'Medialist - Play',
+		name: 'MEDIALIST | Play',
 		description: 'Plays the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -481,7 +481,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistStop = {
-		name: 'Medialist - Stop',
+		name: 'MEDIALIST | Stop',
 		description: 'Stops the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -490,7 +490,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistPause = {
-		name: 'Medialist - Pause',
+		name: 'MEDIALIST | Pause',
 		description: 'Pauses the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -499,7 +499,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistMoveUp = {
-		name: 'Medialist - Move Up (Selected)',
+		name: 'MEDIALIST | Move Up (Selected)',
 		description: 'Moves a media item up in the selected Medialist',
 		options: [
 			{
@@ -516,7 +516,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistMoveDown = {
-		name: 'Medialist - Move Down (Selected)',
+		name: 'MEDIALIST | Move Down (Selected)',
 		description: 'Moves a media item down in the selected Medialist',
 		options: [
 			{
@@ -720,7 +720,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	*/
 	//RECORDING
 	actions.recordingStart = {
-		name: 'Recording - Start',
+		name: 'RECORDING | Start',
 		description: 'Starts recording using the currently launched application',
 		options: [],
 		callback: async () => {
@@ -729,7 +729,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.recordingStartDuration = {
-		name: 'Recording - Start (Duration)',
+		name: 'RECORDING | Start (Duration)',
 		description: 'Starts recording for a set duration using the currently launched app',
 		options: [
 			{
@@ -747,7 +747,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	/* actions.recordingStartTracking = {
-		name: 'Recording - Start (Tracking)',
+		name: 'RECORDING | Start (Tracking)',
 		description: 'Starts recording using the Tracking application',
 		options: [
 			{
@@ -765,7 +765,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	} */
 
 	actions.recordingStop = {
-		name: 'Recording - Stop',
+		name: 'RECORDING | Stop',
 		description: 'Stops the current recording',
 		options: [],
 		callback: async () => {
@@ -774,7 +774,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.recordingPause = {
-		name: 'Recording - Pause/Resume',
+		name: 'RECORDING | Pause/Resume',
 		description: 'Pauses or resumes the current recording',
 		options: [],
 		callback: async () => {
@@ -783,7 +783,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	/* actions.recordingLiveExtract = {
-		name: 'Recording - Live Extract Start/Stop',
+		name: 'RECORDING | Live Extract Start/Stop',
 		description: 'Starts or stops a live extract recording',
 		options: [
 			{
@@ -810,7 +810,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.recordingAuxStart = {
-		name: 'Recording - Start Aux',
+		name: 'RECORDING | Start Aux',
 		description: 'Starts all configured auxiliary recordings',
 		options: [],
 		callback: async () => {
@@ -819,7 +819,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.recordingAuxStop = {
-		name: 'Recording - Stop Aux',
+		name: 'RECORDING | Stop Aux',
 		description: 'Stops all configured auxiliary recordings',
 		options: [],
 		callback: async () => {
@@ -828,7 +828,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.recordingSplit = {
-		name: 'Recording - Split',
+		name: 'RECORDING | Split',
 		description: 'Updates the split settings',
 		options: [
 			{
@@ -883,7 +883,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	//STREAMING
 	actions.selectStreamingCatalog = {
-		name: 'Streaming - Select Catalog',
+		name: 'STREAMING | Select Catalog',
 		options: [
 			{
 				type: 'dropdown',
@@ -899,7 +899,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.streamingStartAll = {
-		name: 'Streaming - Start All Profiles in Selected Catalog',
+		name: 'STREAMING | Start All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
 			await SendCommand(self, `/api/v2/streaming/selected/profiles/startall`, 'POST')
@@ -907,7 +907,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.streamingStopAll = {
-		name: 'Streaming - Stop All Profiles in Selected Catalog',
+		name: 'STREAMING | Stop All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
 			await SendCommand(self, `/api/v2/streaming/selected/profiles/stopall`, 'POST')
@@ -915,7 +915,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.streamingStartProfile = {
-		name: 'Streaming - Start Profile',
+		name: 'STREAMING | Start Profile',
 		options: [
 			{
 				type: 'dropdown',
@@ -931,7 +931,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.streamingStopProfile = {
-		name: 'Streaming - Stop Profile',
+		name: 'STREAMING | Stop Profile',
 		options: [
 			{
 				type: 'dropdown',
@@ -1096,7 +1096,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	//VIDEO
 	actions.videoChangeLiveSource = {
-		name: 'Video - Change Live Source',
+		name: 'VIDEO | Change Live Source',
 		description: 'Changes the live video source.',
 		options: [
 			{
@@ -1116,7 +1116,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.videoRestartOutput = {
-		name: 'Video - Restart Output',
+		name: 'VIDEO | Restart Output',
 		description: 'Restarts the video output.',
 		options: [],
 		callback: async () => {
@@ -1126,7 +1126,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	//Manual Poll
 	actions.manualPoll = {
-		name: 'Manually Refresh Data',
+		name: 'APPLICATION | Manually Refresh Data',
 		description: 'Manually poll the application to update data.',
 		options: [],
 		callback: async () => {
