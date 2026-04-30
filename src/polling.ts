@@ -22,7 +22,7 @@ export function startPolling(self: MulticamInstance): void {
 	}
 
 	self.pollInterval = setInterval(() => {
-		runPollCycle(self)
+		void runPollCycle(self)
 	}, interval)
 
 	self.log('info', `Started polling every ${interval}ms`)
@@ -141,10 +141,9 @@ async function pollApplication(self: MulticamInstance) {
 	}
 }
 
-async function pollAudio(self: MulticamInstance) {
+async function pollAudio(_self: MulticamInstance) {
 	//get audio profiles
 	//self.log('info', 'Polling audio profiles')
-
 	/*const profiles = await fetchData(self, '/api/v1/audio/profiles')
 	if (profiles) {
 		self.AUDIO_PROFILES = profiles
@@ -283,9 +282,8 @@ async function pollComposer(self: MulticamInstance) {
 	}
 }
 
-async function pollConf(self: MulticamInstance) {
+async function pollConf(_self: MulticamInstance) {
 	//self.log('info', 'Polling Conf')
-
 	//get workspace information
 	/*const workspace = await fetchData(self, '/api/v2/conf/workspace')
     if (workspace) {
@@ -329,7 +327,7 @@ async function pollConf(self: MulticamInstance) {
     }*/
 }
 
-async function pollInsitu(self: MulticamInstance) {
+async function pollInsitu(_self: MulticamInstance) {
 	//self.log('info', 'Polling Insitu')
 	/*
     //get tags
@@ -401,15 +399,15 @@ async function pollMedialist(self: MulticamInstance) {
 	}
 }
 
-async function pollPublisher(self: MulticamInstance) {
+async function pollPublisher(_self: MulticamInstance) {
 	//self.log('info', 'Polling publisher - not yet implemented')
 }
 
-async function pollRadio(self: MulticamInstance) {
+async function pollRadio(_self: MulticamInstance) {
 	//self.log('info', 'Polling radio - not yet implemented')
 }
 
-async function pollRecording(self: MulticamInstance) {
+async function pollRecording(_self: MulticamInstance) {
 	//self.log('info', 'Polling recording - not yet implemented')
 }
 
@@ -494,11 +492,11 @@ async function pollScenes(self: MulticamInstance) {
 	}
 }
 
-async function pollStreaming(self: MulticamInstance) {
+async function pollStreaming(_self: MulticamInstance) {
 	//self.log('info', 'Polling streaming - not yet implemented')
 }
 
-async function pollStudio(self: MulticamInstance) {
+async function pollStudio(_self: MulticamInstance) {
 	//self.log('info', 'Polling studio - not yet implemented')
 }
 
@@ -710,14 +708,14 @@ async function pollTitler(self: MulticamInstance) {
 	}
 }
 
-async function pollVideo(self: MulticamInstance) {
+async function pollVideo(_self: MulticamInstance) {
 	//self.log('info', 'Polling video - not yet implemented')
 }
 
-export async function updateVariable(self: MulticamInstance, varName: string, value: any) {
+export async function updateVariable(self: MulticamInstance, varName: string, value: unknown): Promise<void> {
 	const variableObj: any = {}
 	variableObj[varName] = value
-	await self.setVariableValues(variableObj)
+	self.setVariableValues(variableObj)
 }
 
 async function fetchData(self: MulticamInstance, endpoint: string, method?: string, payload?: any): Promise<any> {
@@ -733,7 +731,7 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 				method = 'GET'
 			}
 
-			let headers: any = {
+			const headers: any = {
 				'Content-Type': 'application/json',
 			}
 

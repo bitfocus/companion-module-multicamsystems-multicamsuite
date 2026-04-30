@@ -35,7 +35,7 @@ export async function InitConnection(self: MulticamInstance): Promise<void> {
 	}
 }
 
-function timeout(ms: number): Promise<never> {
+async function timeout(ms: number): Promise<never> {
 	return new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms))
 }
 
@@ -53,7 +53,7 @@ export async function SendCommand(
 				self.log('debug', `Sending: ${url}`)
 			}
 
-			let headers: any = {
+			const headers: any = {
 				'Content-Type': 'application/json',
 			}
 
@@ -64,7 +64,7 @@ export async function SendCommand(
 			} else {
 				self.log(
 					'debug',
-					`No API Key specified, relying on Companion IP being added to Multicam\'s Machine addresses list.`,
+					`No API Key specified, relying on Companion IP being added to Multicam's Machine addresses list.`,
 				)
 			}
 

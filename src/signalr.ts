@@ -4,7 +4,7 @@ import type { MulticamInstance } from './main.js'
 function safeStringify(value: any): string {
 	try {
 		return JSON.stringify(value)
-	} catch (e) {
+	} catch (_e) {
 		return String(value)
 	}
 }
