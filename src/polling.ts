@@ -36,31 +36,31 @@ export function stopPolling(): void {
 }
 
 async function runPollCycle(self: MulticamInstance): Promise<void> {
-	//try {
-	await pollApplication(self)
-	await pollAudio(self)
-	await pollConf(self)
-	await pollComposer(self)
-	await pollInsitu(self)
-	await pollMedialist(self)
-	await pollPublisher(self)
-	await pollRadio(self)
-	await pollRecording(self)
-	await pollScenes(self)
-	await pollStreaming(self)
-	await pollStudio(self)
-	await pollTitler(self)
-	await pollVideo(self)
-	/*} catch (err) {
+	try {
+		await pollApplication(self)
+		await pollAudio(self)
+		await pollConf(self)
+		await pollComposer(self)
+		await pollInsitu(self)
+		await pollMedialist(self)
+		await pollPublisher(self)
+		await pollRadio(self)
+		await pollRecording(self)
+		await pollScenes(self)
+		await pollStreaming(self)
+		await pollStudio(self)
+		await pollTitler(self)
+		await pollVideo(self)
+	} catch (err) {
 		self.log('error', `Polling failed: ${err}`)
-		console.log('log', `${err}`)
-		stopPolling()
-	}*/
+		//console.log('log', `${err}`)
+		//stopPolling()
+	}
 }
 
 async function pollApplication(self: MulticamInstance) {
 	//get system information
-	self.log('info', 'Polling application/system information')
+	self.log('debug', 'Polling application/system information')
 
 	const data = await fetchData(self, '/api/application/system')
 	if (data) {
@@ -170,7 +170,7 @@ async function pollAudio(_self: MulticamInstance) {
 }
 
 async function pollComposer(self: MulticamInstance) {
-	self.log('info', 'Polling Composer')
+	self.log('debug', 'Polling Composer')
 
 	//get composer files
 	const files = await fetchData(self, '/api/v3/composer')
@@ -345,7 +345,7 @@ async function pollInsitu(_self: MulticamInstance) {
 }
 
 async function pollMedialist(self: MulticamInstance) {
-	self.log('info', 'Polling Medialist')
+	self.log('debug', 'Polling Medialist')
 
 	//get available medialists
 	//api/v3/medialist
@@ -412,7 +412,7 @@ async function pollRecording(_self: MulticamInstance) {
 }
 
 async function pollScenes(self: MulticamInstance) {
-	self.log('info', 'Polling scenes')
+	self.log('debug', 'Polling scenes')
 
 	//get scenes files
 	const sceneFiles = await fetchData(self, '/api/v2/scenes/files')
