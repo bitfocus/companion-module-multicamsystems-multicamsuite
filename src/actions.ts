@@ -716,14 +716,14 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, 'radio/automation/variables')
 		},
 	}
-
+	*/
 	//RECORDING
 	actions.recordingStart = {
 		name: 'Recording - Start',
 		description: 'Starts recording using the currently launched application',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/start')
+			await SendCommand(self, '/api/recording/start', 'POST')
 		},
 	}
 
@@ -740,11 +740,12 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `api/recording/start/${action.options.duration}`)
+			const duration = encodeURIComponent(String(action.options.duration ?? ''))
+			await SendCommand(self, `/api/recording/start/${duration}`, 'POST')
 		},
 	}
 
-	actions.recordingStartTracking = {
+	/* actions.recordingStartTracking = {
 		name: 'Recording - Start (Tracking)',
 		description: 'Starts recording using the Tracking application',
 		options: [
@@ -760,14 +761,14 @@ export function UpdateActions(self: MulticamInstance): void {
 			const duration = await self.parseVariablesInString(String(action.options.duration))
 			await SendCommand(self, 'api/recording/startRecording', 'POST', duration)
 		},
-	}
+	} */
 
 	actions.recordingStop = {
 		name: 'Recording - Stop',
 		description: 'Stops the current recording',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/stop')
+			await SendCommand(self, '/api/recording/stop', 'POST')
 		},
 	}
 
@@ -776,11 +777,11 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Pauses or resumes the current recording',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/pause')
+			await SendCommand(self, '/api/recording/pause', 'POST')
 		},
 	}
 
-	actions.recordingLiveExtract = {
+	/* actions.recordingLiveExtract = {
 		name: 'Recording - Live Extract Start/Stop',
 		description: 'Starts or stops a live extract recording',
 		options: [
@@ -841,7 +842,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			const duration = await self.parseVariablesInString(String(action.options.duration))
 			await SendCommand(self, `/api/recording/split?newSplitDuration=${duration}`, 'POST')
 		},
-	}*/
+	} */
 
 	//SCENES
 
@@ -878,7 +879,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, `/api/v2/scenes/selected/${action.options.sceneId}/take`, 'POST')
 		},
 	}
-	/*
+
 	//STREAMING
 	actions.selectStreamingCatalog = {
 		name: 'Streaming - Select Catalog',
@@ -892,7 +893,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/${action.options.catalogId}`)
+			await SendCommand(self, `/api/v2/streaming/selected/${action.options.catalogId}`, 'POST')
 		},
 	}
 
@@ -900,7 +901,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		name: 'Streaming - Start All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v2/streaming/selected/profiles/startall`)
+			await SendCommand(self, `/api/v2/streaming/selected/profiles/startall`, 'POST')
 		},
 	}
 
@@ -908,7 +909,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		name: 'Streaming - Stop All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v2/streaming/selected/profiles/stopall`)
+			await SendCommand(self, `/api/v2/streaming/selected/profiles/stopall`, 'POST')
 		},
 	}
 
@@ -924,7 +925,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/start`)
+			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/start`, 'POST')
 		},
 	}
 
@@ -940,11 +941,11 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/stop`)
+			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/stop`, 'POST')
 		},
 	}
 
-	//STUDIO
+	/* 	//STUDIO
 
 	actions.storePreset = {
 		name: 'Studio - Store Preset',
@@ -981,8 +982,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, `/api/studio/autoframe/${action.options.cameraIndex}`)
 		},
 	}
-		*/
-
+ */
 	//SYSTEM
 
 	actions.shutdownSystem = {
@@ -1093,24 +1093,24 @@ export function UpdateActions(self: MulticamInstance): void {
 		},
 	}
 
-	/*
 	//VIDEO
-
 	actions.videoChangeLiveSource = {
 		name: 'Video - Change Live Source',
 		description: 'Changes the live video source.',
 		options: [
 			{
 				type: 'textinput',
-				label: "Name of the source (ie 'Source 1' or 'PC Input' or 'Medialist')",
+				label: 'Source Name',
 				id: 'sourceName',
 				default: 'Source 1',
 				required: true,
+				tooltip: '(ie "Source 1" or "PC Input" or "Medialist")',
 			},
 		],
 		callback: async (action) => {
-			const sourceName = await self.parseVariablesInString(String(action.options.sourceName))
-			await SendCommand(self, `/api/video/live/source/${sourceName}`)
+			const parsedName = await self.parseVariablesInString(String(action.options.sourceName))
+			const sourceName = encodeURIComponent(String(parsedName ?? ''))
+			await SendCommand(self, `/api/video/live/source/${sourceName}`, 'POST')
 		},
 	}
 
@@ -1119,9 +1119,9 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Restarts the video output.',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/video/restartoutput`)
+			await SendCommand(self, `/api/video/restartoutput`, 'POST')
 		},
 	}
-*/
+
 	self.setActionDefinitions(actions)
 }

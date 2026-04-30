@@ -492,8 +492,23 @@ async function pollScenes(self: MulticamInstance) {
 	}
 }
 
-async function pollStreaming(_self: MulticamInstance) {
-	//self.log('info', 'Polling streaming - not yet implemented')
+async function pollStreaming(self: MulticamInstance) {
+	self.log('debug', 'Polling streaming')
+	const streamingCatalogs = await fetchData(self, '/api/v2/streaming/catalogs')
+	if (streamingCatalogs) {
+		if (JSON.stringify(self.CHOICES_STREAMING_CATALOGS) !== JSON.stringify(streamingCatalogs)) {
+			self.CHOICES_STREAMING_CATALOGS = streamingCatalogs.map((c: any) => ({ id: c.Id, label: c.Name }))
+			self.updateActions()
+		}
+	}
+
+	const streamingProfiles = await fetchData(self, '/api/v2/streaming/selected/profiles')
+	if (streamingProfiles) {
+		if (JSON.stringify(self.CHOICES_STREAMING_PROFILES) !== JSON.stringify(streamingProfiles)) {
+			self.CHOICES_STREAMING_PROFILES = streamingProfiles.map((p: any) => ({ id: p.Id, label: p.Name }))
+			self.updateActions()
+		}
+	}
 }
 
 async function pollStudio(_self: MulticamInstance) {
