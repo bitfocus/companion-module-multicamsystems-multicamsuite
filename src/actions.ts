@@ -3,6 +3,7 @@ import { CompanionActionDefinitions } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 
 import { SendCommand } from './api.js'
+import { runPollCycle } from './polling.js'
 
 export function UpdateActions(self: MulticamInstance): void {
 	const actions: CompanionActionDefinitions = {}
@@ -1120,6 +1121,17 @@ export function UpdateActions(self: MulticamInstance): void {
 		options: [],
 		callback: async () => {
 			await SendCommand(self, `/api/video/restartoutput`, 'POST')
+		},
+	}
+
+	//Manual Poll
+	actions.manualPoll = {
+		name: 'Manually Refresh Data',
+		description: 'Manually poll the application to update data.',
+		options: [],
+		callback: async () => {
+			void runPollCycle(self)
+			self.log('info', 'Manual poll completed')
 		},
 	}
 

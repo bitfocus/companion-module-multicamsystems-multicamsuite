@@ -11,7 +11,7 @@ export function startPolling(self: MulticamInstance): void {
 	let interval = 30000
 
 	if (!self.config.enablePolling) {
-		self.log('info', 'Polling is disabled in config; will poll every 30 seconds instead')
+		self.log('info', 'Polling is disabled in config, use "Manually Refresh Data" action to update data')
 	} else {
 		interval = Number(self.config.pollingInterval || 5000)
 
@@ -19,13 +19,13 @@ export function startPolling(self: MulticamInstance): void {
 			self.log('error', 'Invalid polling interval in config')
 			return
 		}
+
+		self.pollInterval = setInterval(() => {
+			void runPollCycle(self)
+		}, interval)
+
+		self.log('info', `Started polling every ${interval}ms`)
 	}
-
-	self.pollInterval = setInterval(() => {
-		void runPollCycle(self)
-	}, interval)
-
-	self.log('info', `Started polling every ${interval}ms`)
 }
 
 export function stopPolling(): void {
@@ -35,7 +35,7 @@ export function stopPolling(): void {
 	}
 }
 
-async function runPollCycle(self: MulticamInstance): Promise<void> {
+export async function runPollCycle(self: MulticamInstance): Promise<void> {
 	try {
 		await pollApplication(self)
 		await pollAudio(self)
