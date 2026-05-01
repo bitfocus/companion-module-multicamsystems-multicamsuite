@@ -38,10 +38,11 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 		{
 			type: 'textinput',
 			id: 'port',
-			label: 'Target Port (Default: 80)',
+			label: 'Target Port',
 			width: 3,
 			default: '80',
 			regex: Regex.PORT,
+			tooltip: 'Default is 80.',
 		},
 		{
 			type: 'static-text',
