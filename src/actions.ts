@@ -72,11 +72,11 @@ export function UpdateActions(self: MulticamInstance): void {
 				required: true,
 			},
 			{
-				type: 'textinput',
-				label: 'Room ID',
+				type: 'dropdown',
+				label: 'Room',
 				id: 'roomId',
-				default: '',
-				required: true,
+				default: self.CHOICES_ROOMS[0]?.id || '',
+				choices: self.CHOICES_ROOMS,
 			},
 			{
 				type: 'checkbox',
@@ -451,28 +451,14 @@ export function UpdateActions(self: MulticamInstance): void {
 		],
 		callback: async (action) => {
 			await SendCommand(self, `/api/v3/medialist/selected/${action.options.medialist}/select`, 'POST')
+			//Sync medialist items after selection
+			void runPollCycle(self)
 		},
 	}
 
-	actions.medialistAddMedia = {
-		name: 'MEDIALIST | Add Media',
-		description: 'Adds a media to the selected Medialist',
-		options: [
-			{
-				type: 'textinput',
-				label: 'Local Path to Media File',
-				id: 'mediaId',
-				default: '',
-			},
-		],
-		callback: async (action) => {
-			const path = await self.parseVariablesInString(String(action.options.mediaId))
-			await SendCommand(self, `/api/v3/medialist/selected/media`, 'POST', path)
-		},
-	}
-
+	//Selected Medialist Commands
 	actions.medialistPlay = {
-		name: 'MEDIALIST | Play',
+		name: 'MEDIALIST | Selected Medialist - Play',
 		description: 'Plays the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -481,7 +467,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistStop = {
-		name: 'MEDIALIST | Stop',
+		name: 'MEDIALIST | Selected Medialist - Stop',
 		description: 'Stops the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -490,7 +476,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistPause = {
-		name: 'MEDIALIST | Pause',
+		name: 'MEDIALIST | Selected Medialist - Pause',
 		description: 'Pauses the currently selected Medialist',
 		options: [],
 		callback: async () => {
@@ -499,7 +485,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistMoveUp = {
-		name: 'MEDIALIST | Move Up (Selected)',
+		name: 'MEDIALIST | Selected Medialist - Move Up',
 		description: 'Moves a media item up in the selected Medialist',
 		options: [
 			{
@@ -516,7 +502,7 @@ export function UpdateActions(self: MulticamInstance): void {
 	}
 
 	actions.medialistMoveDown = {
-		name: 'MEDIALIST | Move Down (Selected)',
+		name: 'MEDIALIST | Selected Medialist - Move Down',
 		description: 'Moves a media item down in the selected Medialist',
 		options: [
 			{
@@ -529,6 +515,112 @@ export function UpdateActions(self: MulticamInstance): void {
 		],
 		callback: async (action) => {
 			await SendCommand(self, `medialist/selected/${action.options.mediaId}/movedown`)
+		},
+	}
+
+	actions.medialistPlayMedia = {
+		name: 'MEDIALIST | Selected Medialist - Select and Play Media',
+		description: 'Selects and plays the specified media in the selected Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Media',
+				id: 'mediaId',
+				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/play`, 'POST')
+		},
+	}
+
+	actions.medialistAddMedia = {
+		name: 'MEDIALIST | Selected Medialist - Add Media',
+		description: 'Adds a media to the selected Medialist',
+		options: [
+			{
+				type: 'textinput',
+				label: 'Local Path to Media File',
+				id: 'mediaId',
+				default: '',
+			},
+		],
+		callback: async (action) => {
+			const path = await self.parseVariablesInString(String(action.options.mediaId))
+			await SendCommand(self, `/api/v3/medialist/selected/media`, 'POST', path)
+		},
+	}
+
+	//Custom Medialist Commands
+	actions.medialistPlayCustom = {
+		name: 'MEDIALIST | Custom Medialist - Play',
+		description: 'Plays the specified Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Medialist',
+				id: 'medialistId',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/play`, 'POST')
+		},
+	}
+
+	actions.medialistPlayMediaCustom = {
+		name: 'MEDIALIST | Custom Medialist - Select and Play Media',
+		description: 'Selects and plays the specified media in the specified Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Medialist',
+				id: 'medialistId',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
+			},
+			{
+				type: 'dropdown',
+				label: 'Media',
+				id: 'mediaId',
+				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			const mediaId = action.options.mediaId as string
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/${mediaId}`, 'POST')
+		},
+	}
+
+	actions.medialistPlayMediaCustomByIndex = {
+		name: 'MEDIALIST | Custom Medialist - Select and Play Media By Index',
+		description: 'Selects and plays the specified media in the specified Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Medialist',
+				id: 'medialistId',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
+			},
+			{
+				type: 'textinput',
+				label: 'Media Index',
+				id: 'mediaIndex',
+				default: '0',
+				useVariables: true,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			const mediaIndex = await self.parseVariablesInString(String(action.options.mediaIndex))
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/${mediaIndex}`, 'POST')
 		},
 	}
 

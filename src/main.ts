@@ -12,6 +12,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_APPLICATIONS: { id: string; label: string }[]
 	APPLICATIONS: any[] = [] //list of licensed applications
 	ROOMS: any[] = [] //list of rooms
+	CHOICES_ROOMS: { id: string; label: string }[] = [] //choices for rooms
 	ROOM_SELECTED: any = {} //currently selected room
 	AUDIO_PROFILES: any[] = [] //list of audio profiles
 	AUDIO_PROFILE_SELECTED: any = {} //currently selected audio profile

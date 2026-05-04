@@ -111,6 +111,17 @@ async function pollApplication(self: MulticamInstance) {
 	if (rooms) {
 		self.ROOMS = rooms
 		await updateVariable(self, 'rooms', rooms.join(', '))
+		//Build CHOICES_ROOMS
+		const choices = rooms.map((r: any) => {
+			return { id: r.Id, label: r.Name }
+		})
+		if (choices.length === 0) {
+			choices.push({ id: 'None', label: 'None' })
+		}
+		if (JSON.stringify(self.CHOICES_ROOMS) !== JSON.stringify(choices)) {
+			self.CHOICES_ROOMS = choices
+			self.updateActions()
+		}
 	}
 
 	//get selected room
