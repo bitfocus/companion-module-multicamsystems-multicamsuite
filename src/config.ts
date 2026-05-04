@@ -85,14 +85,16 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			type: 'checkbox',
 			id: 'enablePolling',
 			label: 'Enable Polling',
-			default: true,
+			default: false,
 			width: 4,
+			tooltip:
+				'Enable polling to automatically update data every interval. Data can also be manually updated using the "Manually Refresh Data" action.',
 		},
 		{
 			type: 'number',
 			id: 'pollingInterval',
 			label: 'Polling Interval (ms)',
-			default: 1000,
+			default: 10000,
 			min: 100,
 			max: 60000,
 			width: 8,
