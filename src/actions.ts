@@ -1111,7 +1111,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		callback: async (action) => {
 			const parsedName = await self.parseVariablesInString(String(action.options.sourceName))
 			const sourceName = encodeURIComponent(String(parsedName ?? ''))
-			await SendCommand(self, `/api/video/live/source/${sourceName}`, 'POST')
+			await SendCommand(self, `/api/video/live/${sourceName}`, 'POST')
 		},
 	}
 
