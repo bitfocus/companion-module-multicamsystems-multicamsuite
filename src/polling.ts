@@ -2,6 +2,29 @@ import type { MulticamInstance } from './main.js'
 
 let pollInterval: NodeJS.Timeout | undefined = undefined
 
+/** Suppress repeated identical fetch errors (e.g. many endpoints failing when Multicam closes) until a request succeeds. */
+type FetchErrorDedupeState = {
+	suppressDuplicateMessage: string | null
+}
+
+const fetchErrorDedupeByInstance = new WeakMap<MulticamInstance, FetchErrorDedupeState>()
+
+function getFetchErrorDedupeState(self: MulticamInstance): FetchErrorDedupeState {
+	let s = fetchErrorDedupeByInstance.get(self)
+	if (!s) {
+		s = { suppressDuplicateMessage: null }
+		fetchErrorDedupeByInstance.set(self, s)
+	}
+	return s
+}
+
+function markFetchSucceeded(self: MulticamInstance): void {
+	const s = fetchErrorDedupeByInstance.get(self)
+	if (s) {
+		s.suppressDuplicateMessage = null
+	}
+}
+
 export function startPolling(self: MulticamInstance): void {
 	stopPolling()
 
@@ -355,6 +378,50 @@ async function pollInsitu(_self: MulticamInstance) {
 */
 }
 
+/** Separator between medialist id and media id in {@link MulticamInstance.CHOICES_MEDIALISTS_MEDIA} choice ids. */
+const MEDIALIST_MEDIA_ID_SEP = '|'
+
+/** Parse composite id from {@link buildMedialistsMediaChoices}. */
+export function parseMedialistMediaGlobalChoiceId(choiceId: string): { medialistId: string; mediaId: string } | null {
+	if (!choiceId || choiceId === 'None') return null
+	const i = choiceId.indexOf(MEDIALIST_MEDIA_ID_SEP)
+	if (i <= 0 || i === choiceId.length - 1) return null
+	return { medialistId: choiceId.slice(0, i), mediaId: choiceId.slice(i + 1) }
+}
+
+async function buildMedialistsMediaChoices(
+	self: MulticamInstance,
+	medialists: any[],
+): Promise<{ id: string; label: string }[]> {
+	const buckets = await Promise.all(
+		medialists.map(async (ml: any) => {
+			const mlName = String(ml.Name ?? '')
+			const mlId = String(ml.Id ?? '')
+			let items: any[] = Array.isArray(ml.Items) ? ml.Items : []
+			if (items.length === 0 && mlId) {
+				const detail = await fetchData(self, `/api/v3/medialist/${mlId}`)
+				if (detail && typeof detail === 'object' && Array.isArray(detail.Items)) {
+					items = detail.Items
+				}
+			}
+			return items.map((it: any) => {
+				const mediaId = String(it.Id ?? '')
+				const mediaName = String(it.MediaName ?? it.Name ?? '')
+				return {
+					id: `${mlId}${MEDIALIST_MEDIA_ID_SEP}${mediaId}`,
+					label: `${mlName} - ${mediaName}`,
+				}
+			})
+		}),
+	)
+	const choices = buckets.flat()
+	if (choices.length === 0) {
+		return [{ id: 'None', label: 'None' }]
+	}
+	choices.sort((a, b) => a.label.localeCompare(b.label))
+	return choices
+}
+
 async function pollMedialist(self: MulticamInstance) {
 	self.log('debug', 'Polling Medialist')
 
@@ -382,8 +449,21 @@ async function pollMedialist(self: MulticamInstance) {
 			self.updateActions()
 			self.updateFeedbacks()
 		}
+
+		const allMediaChoices = await buildMedialistsMediaChoices(self, medialists)
+		if (JSON.stringify(self.CHOICES_MEDIALISTS_MEDIA) !== JSON.stringify(allMediaChoices)) {
+			self.CHOICES_MEDIALISTS_MEDIA = allMediaChoices
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 	} else {
 		self.log('debug', 'Unable to fetch medialists, application not launched')
+		const emptyAllMedia = [{ id: 'None', label: 'None' }]
+		if (JSON.stringify(self.CHOICES_MEDIALISTS_MEDIA) !== JSON.stringify(emptyAllMedia)) {
+			self.CHOICES_MEDIALISTS_MEDIA = emptyAllMedia
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 	}
 
 	//get selected medialist
@@ -392,6 +472,24 @@ async function pollMedialist(self: MulticamInstance) {
 	const selectedMedialist = await fetchData(self, '/api/v3/medialist/selected')
 	if (selectedMedialist && selectedMedialist !== 'Application not launched!') {
 		self.MEDIALIST_SELECTED = selectedMedialist
+		let nextSelectedMedia: { id: string; label: string }[]
+		if (selectedMedialist.Items && selectedMedialist.Items.length > 0) {
+			const mlName = String(selectedMedialist.Name ?? '')
+			nextSelectedMedia = selectedMedialist.Items.map((m: any) => ({
+				id: m.Id,
+				label: `${mlName} - ${m.MediaName}`,
+			}))
+			if (nextSelectedMedia.length === 0) {
+				nextSelectedMedia.push({ id: 'None', label: 'None' })
+			}
+		} else {
+			nextSelectedMedia = [{ id: 'None', label: 'None' }]
+		}
+		if (JSON.stringify(self.CHOICES_MEDIALIST_SELECTED_MEDIA) !== JSON.stringify(nextSelectedMedia)) {
+			self.CHOICES_MEDIALIST_SELECTED_MEDIA = nextSelectedMedia
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 		await updateVariable(self, 'medialistSelectedName', selectedMedialist.Name || '')
 		await updateVariable(self, 'medialistSelectedId', selectedMedialist.Id || '')
 	} else {
@@ -785,16 +883,25 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 			const raw = await response.text()
 
 			if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
-				return JSON.parse(raw)
+				const parsed = JSON.parse(raw)
+				markFetchSucceeded(self)
+				return parsed
 			} else {
-				return raw.trim()
+				const trimmed = raw.trim()
+				markFetchSucceeded(self)
+				return trimmed
 			}
 		} else {
 			self.log('error', 'Invalid host or port configuration')
 			return null
 		}
 	} catch (error: any) {
-		self.log('error', `Failed to fetch data: ${error.message || error}`)
+		const message = String(error?.message ?? error)
+		const dedupe = getFetchErrorDedupeState(self)
+		if (dedupe.suppressDuplicateMessage !== message) {
+			self.log('error', `Failed to fetch data: ${message}`)
+			dedupe.suppressDuplicateMessage = message
+		}
 		return null
 	}
 }

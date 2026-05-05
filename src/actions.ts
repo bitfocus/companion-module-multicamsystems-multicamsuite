@@ -3,7 +3,7 @@ import { CompanionActionDefinitions } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 
 import { SendCommand } from './api.js'
-import { runPollCycle } from './polling.js'
+import { runPollCycle, parseMedialistMediaGlobalChoiceId } from './polling.js'
 
 export function UpdateActions(self: MulticamInstance): void {
 	const actions: CompanionActionDefinitions = {}
@@ -471,7 +471,7 @@ export function UpdateActions(self: MulticamInstance): void {
 		description: 'Stops the currently selected Medialist',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/stop`, 'POST')
+			await SendCommand(self, `/api/v3/medialist/selected/stop`, 'POST', true)
 		},
 	}
 
@@ -497,7 +497,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `medialist/selected/${action.options.mediaId}/moveup`)
+			await SendCommand(self, `/api/v3/medialist/selected/${action.options.mediaId}/moveup`, 'POST')
 		},
 	}
 
@@ -514,7 +514,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `medialist/selected/${action.options.mediaId}/movedown`)
+			await SendCommand(self, `/api/v3/medialist/selected/${action.options.mediaId}/movedown`, 'POST')
 		},
 	}
 
@@ -578,23 +578,16 @@ export function UpdateActions(self: MulticamInstance): void {
 		options: [
 			{
 				type: 'dropdown',
-				label: 'Medialist',
-				id: 'medialistId',
-				default: self.CHOICES_MEDIALISTS[0]?.id || '',
-				choices: self.CHOICES_MEDIALISTS,
-			},
-			{
-				type: 'dropdown',
-				label: 'Media',
-				id: 'mediaId',
-				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
-				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+				label: 'Medialist / Media',
+				id: 'medialistMedia',
+				default: self.CHOICES_MEDIALISTS_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS_MEDIA,
 			},
 		],
 		callback: async (action) => {
-			const medialistId = action.options.medialistId as string
-			const mediaId = action.options.mediaId as string
-			await SendCommand(self, `/api/v3/medialist/${medialistId}/${mediaId}`, 'POST')
+			const parsed = parseMedialistMediaGlobalChoiceId(String(action.options.medialistMedia ?? ''))
+			if (!parsed) return
+			await SendCommand(self, `/api/v3/medialist/${parsed.medialistId}/${parsed.mediaId}`, 'POST')
 		},
 	}
 

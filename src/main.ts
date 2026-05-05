@@ -31,6 +31,8 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_VIDEO_SOURCES: { id: string; label: string }[] = []
 
 	CHOICES_MEDIALIST_SELECTED_MEDIA: { id: string; label: string }[] = [] //choices for media in selected medialist
+	/** All media in all medialists; id is `medialistId|mediaId`, label `Medialist Name - Media Name`. */
+	CHOICES_MEDIALISTS_MEDIA: { id: string; label: string }[] = []
 	MEDIALISTS: any[] = [] //list of medialists
 	CHOICES_MEDIALISTS: { id: string; label: string }[] = [] //choices for medialists
 	MEDIALIST_SELECTED: any = {} //currently selected medialist
@@ -131,6 +133,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		] //choices for video sources (cameras, screen captures, etc.)
 
 		this.CHOICES_MEDIALIST_SELECTED_MEDIA = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_MEDIALISTS_MEDIA = [{ id: 'None', label: 'None' }]
 
 		this.CHOICES_RADIO_PRESET_BANKS = [{ id: 'none', label: 'None' }] //default value
 
