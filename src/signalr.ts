@@ -1,5 +1,5 @@
 import * as signalR from '@microsoft/signalr'
-import type { MulticamInstance } from './main.js'
+import type { MulticamInstance, StreamingProfile } from './main.js'
 
 function safeStringify(value: any): string {
 	try {
@@ -240,6 +240,33 @@ export function InitSignalR(instance: MulticamInstance): void {
 
 		connection.on('OnZoneUpdated', (zone: any) => {
 			instance.log('debug', `SignalR: OnZoneUpdated: ${safeStringify([zone])}`)
+		})
+
+		connection.on('OnRecordStarted', (media: any) => {
+			instance.log('debug', `SignalR: OnRecordStarted: ${safeStringify([media])}`)
+			instance.setVariableValues({
+				recording: true,
+			})
+			instance.checkFeedbacks('recording')
+		})
+
+		connection.on('OnRecordStopped', () => {
+			instance.log('debug', 'SignalR: OnRecordStopped')
+			instance.setVariableValues({
+				recording: false,
+			})
+			instance.checkFeedbacks('recording')
+		})
+
+		connection.on('OnStreamingStarted', (profile: StreamingProfile) => {
+			instance.log('debug', `SignalR: OnStreamingStarted: ${safeStringify([profile])}`)
+			instance.ACTIVE_STREAMS.push(profile)
+			instance.checkFeedbacks('streaming')
+		})
+		connection.on('OnStreamingStopped', (profile: StreamingProfile) => {
+			instance.log('debug', `SignalR: OnStreamingStopped: ${safeStringify([profile])}`)
+			instance.ACTIVE_STREAMS = instance.ACTIVE_STREAMS.filter((p) => p.id !== profile.id)
+			instance.checkFeedbacks('streaming')
 		})
 
 		// ---- start ----

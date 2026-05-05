@@ -7,6 +7,17 @@ import { UpdateVariableDefinitions } from './variables.js'
 import { InitConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
 
+export interface StreamingProfile {
+	id: string
+	name: string
+	isEnabled: boolean
+	broadcastServerHostname: string
+	broadcastStreamID: string
+	isStarted: boolean
+	canBeLaunchedRemotely: boolean
+	errorMessage: string
+}
+
 export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	config!: ModuleConfig // Setup in init()
 	CHOICES_APPLICATIONS: { id: string; label: string }[]
@@ -59,6 +70,10 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_TITLER_ELEMENTS: { id: string; label: string }[] = [] //choices for titler elements
 	CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS: { id: string; label: string }[] = [] //choices for titler elements speaker rows
 	CHOICES_TITLER_ELEMENTS_PANEL_ROWS: { id: string; label: string }[] = [] //choices for titler elements panel rows
+
+	//STATUS
+	RECORDING: boolean = false //recording is currently active
+	ACTIVE_STREAMS: StreamingProfile[] = [] //profiles in the selected streaming catalog
 
 	pollInterval: NodeJS.Timeout | null = null
 	_signalR: signalR.HubConnection | null = null
