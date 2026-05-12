@@ -2,6 +2,29 @@ import type { MulticamInstance } from './main.js'
 
 let pollInterval: NodeJS.Timeout | undefined = undefined
 
+/** Suppress repeated identical fetch errors (e.g. many endpoints failing when Multicam closes) until a request succeeds. */
+type FetchErrorDedupeState = {
+	suppressDuplicateMessage: string | null
+}
+
+const fetchErrorDedupeByInstance = new WeakMap<MulticamInstance, FetchErrorDedupeState>()
+
+function getFetchErrorDedupeState(self: MulticamInstance): FetchErrorDedupeState {
+	let s = fetchErrorDedupeByInstance.get(self)
+	if (!s) {
+		s = { suppressDuplicateMessage: null }
+		fetchErrorDedupeByInstance.set(self, s)
+	}
+	return s
+}
+
+function markFetchSucceeded(self: MulticamInstance): void {
+	const s = fetchErrorDedupeByInstance.get(self)
+	if (s) {
+		s.suppressDuplicateMessage = null
+	}
+}
+
 export function startPolling(self: MulticamInstance): void {
 	stopPolling()
 
@@ -11,7 +34,7 @@ export function startPolling(self: MulticamInstance): void {
 	let interval = 30000
 
 	if (!self.config.enablePolling) {
-		self.log('info', 'Polling is disabled in config; will poll every 30 seconds instead')
+		self.log('info', 'Polling is disabled in config, use "Manually Refresh Data" action to update data')
 	} else {
 		interval = Number(self.config.pollingInterval || 5000)
 
@@ -19,13 +42,13 @@ export function startPolling(self: MulticamInstance): void {
 			self.log('error', 'Invalid polling interval in config')
 			return
 		}
+
+		self.pollInterval = setInterval(() => {
+			void runPollCycle(self)
+		}, interval)
+
+		self.log('info', `Started polling every ${interval}ms`)
 	}
-
-	self.pollInterval = setInterval(() => {
-		runPollCycle(self)
-	}, interval)
-
-	self.log('info', `Started polling every ${interval}ms`)
 }
 
 export function stopPolling(): void {
@@ -35,32 +58,32 @@ export function stopPolling(): void {
 	}
 }
 
-async function runPollCycle(self: MulticamInstance): Promise<void> {
-	//try {
-	await pollApplication(self)
-	await pollAudio(self)
-	await pollConf(self)
-	await pollComposer(self)
-	await pollInsitu(self)
-	await pollMedialist(self)
-	await pollPublisher(self)
-	await pollRadio(self)
-	await pollRecording(self)
-	await pollScenes(self)
-	await pollStreaming(self)
-	await pollStudio(self)
-	await pollTitler(self)
-	await pollVideo(self)
-	/*} catch (err) {
+export async function runPollCycle(self: MulticamInstance): Promise<void> {
+	try {
+		await pollApplication(self)
+		await pollAudio(self)
+		await pollConf(self)
+		await pollComposer(self)
+		await pollInsitu(self)
+		await pollMedialist(self)
+		await pollPublisher(self)
+		await pollRadio(self)
+		await pollRecording(self)
+		await pollScenes(self)
+		await pollStreaming(self)
+		await pollStudio(self)
+		await pollTitler(self)
+		await pollVideo(self)
+	} catch (err) {
 		self.log('error', `Polling failed: ${err}`)
-		console.log('log', `${err}`)
-		stopPolling()
-	}*/
+		//console.log('log', `${err}`)
+		//stopPolling()
+	}
 }
 
 async function pollApplication(self: MulticamInstance) {
 	//get system information
-	self.log('info', 'Polling application/system information')
+	self.log('debug', 'Polling application/system information')
 
 	const data = await fetchData(self, '/api/application/system')
 	if (data) {
@@ -111,6 +134,17 @@ async function pollApplication(self: MulticamInstance) {
 	if (rooms) {
 		self.ROOMS = rooms
 		await updateVariable(self, 'rooms', rooms.join(', '))
+		//Build CHOICES_ROOMS
+		const choices = rooms.map((r: any) => {
+			return { id: r.Id, label: r.Name }
+		})
+		if (choices.length === 0) {
+			choices.push({ id: 'None', label: 'None' })
+		}
+		if (JSON.stringify(self.CHOICES_ROOMS) !== JSON.stringify(choices)) {
+			self.CHOICES_ROOMS = choices
+			self.updateActions()
+		}
 	}
 
 	//get selected room
@@ -141,10 +175,9 @@ async function pollApplication(self: MulticamInstance) {
 	}
 }
 
-async function pollAudio(self: MulticamInstance) {
+async function pollAudio(_self: MulticamInstance) {
 	//get audio profiles
 	//self.log('info', 'Polling audio profiles')
-
 	/*const profiles = await fetchData(self, '/api/v1/audio/profiles')
 	if (profiles) {
 		self.AUDIO_PROFILES = profiles
@@ -171,7 +204,7 @@ async function pollAudio(self: MulticamInstance) {
 }
 
 async function pollComposer(self: MulticamInstance) {
-	self.log('info', 'Polling Composer')
+	self.log('debug', 'Polling Composer')
 
 	//get composer files
 	const files = await fetchData(self, '/api/v3/composer')
@@ -283,9 +316,8 @@ async function pollComposer(self: MulticamInstance) {
 	}
 }
 
-async function pollConf(self: MulticamInstance) {
+async function pollConf(_self: MulticamInstance) {
 	//self.log('info', 'Polling Conf')
-
 	//get workspace information
 	/*const workspace = await fetchData(self, '/api/v2/conf/workspace')
     if (workspace) {
@@ -329,7 +361,7 @@ async function pollConf(self: MulticamInstance) {
     }*/
 }
 
-async function pollInsitu(self: MulticamInstance) {
+async function pollInsitu(_self: MulticamInstance) {
 	//self.log('info', 'Polling Insitu')
 	/*
     //get tags
@@ -346,8 +378,52 @@ async function pollInsitu(self: MulticamInstance) {
 */
 }
 
+/** Separator between medialist id and media id in {@link MulticamInstance.CHOICES_MEDIALISTS_MEDIA} choice ids. */
+const MEDIALIST_MEDIA_ID_SEP = '|'
+
+/** Parse composite id from {@link buildMedialistsMediaChoices}. */
+export function parseMedialistMediaGlobalChoiceId(choiceId: string): { medialistId: string; mediaId: string } | null {
+	if (!choiceId || choiceId === 'None') return null
+	const i = choiceId.indexOf(MEDIALIST_MEDIA_ID_SEP)
+	if (i <= 0 || i === choiceId.length - 1) return null
+	return { medialistId: choiceId.slice(0, i), mediaId: choiceId.slice(i + 1) }
+}
+
+async function buildMedialistsMediaChoices(
+	self: MulticamInstance,
+	medialists: any[],
+): Promise<{ id: string; label: string }[]> {
+	const buckets = await Promise.all(
+		medialists.map(async (ml: any) => {
+			const mlName = String(ml.Name ?? '')
+			const mlId = String(ml.Id ?? '')
+			let items: any[] = Array.isArray(ml.Items) ? ml.Items : []
+			if (items.length === 0 && mlId) {
+				const detail = await fetchData(self, `/api/v3/medialist/${mlId}`)
+				if (detail && typeof detail === 'object' && Array.isArray(detail.Items)) {
+					items = detail.Items
+				}
+			}
+			return items.map((it: any) => {
+				const mediaId = String(it.Id ?? '')
+				const mediaName = String(it.MediaName ?? it.Name ?? '')
+				return {
+					id: `${mlId}${MEDIALIST_MEDIA_ID_SEP}${mediaId}`,
+					label: `${mlName} - ${mediaName}`,
+				}
+			})
+		}),
+	)
+	const choices = buckets.flat()
+	if (choices.length === 0) {
+		return [{ id: 'None', label: 'None' }]
+	}
+	choices.sort((a, b) => a.label.localeCompare(b.label))
+	return choices
+}
+
 async function pollMedialist(self: MulticamInstance) {
-	self.log('info', 'Polling Medialist')
+	self.log('debug', 'Polling Medialist')
 
 	//get available medialists
 	//api/v3/medialist
@@ -373,8 +449,21 @@ async function pollMedialist(self: MulticamInstance) {
 			self.updateActions()
 			self.updateFeedbacks()
 		}
+
+		const allMediaChoices = await buildMedialistsMediaChoices(self, medialists)
+		if (JSON.stringify(self.CHOICES_MEDIALISTS_MEDIA) !== JSON.stringify(allMediaChoices)) {
+			self.CHOICES_MEDIALISTS_MEDIA = allMediaChoices
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 	} else {
 		self.log('debug', 'Unable to fetch medialists, application not launched')
+		const emptyAllMedia = [{ id: 'None', label: 'None' }]
+		if (JSON.stringify(self.CHOICES_MEDIALISTS_MEDIA) !== JSON.stringify(emptyAllMedia)) {
+			self.CHOICES_MEDIALISTS_MEDIA = emptyAllMedia
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 	}
 
 	//get selected medialist
@@ -383,6 +472,24 @@ async function pollMedialist(self: MulticamInstance) {
 	const selectedMedialist = await fetchData(self, '/api/v3/medialist/selected')
 	if (selectedMedialist && selectedMedialist !== 'Application not launched!') {
 		self.MEDIALIST_SELECTED = selectedMedialist
+		let nextSelectedMedia: { id: string; label: string }[]
+		if (selectedMedialist.Items && selectedMedialist.Items.length > 0) {
+			const mlName = String(selectedMedialist.Name ?? '')
+			nextSelectedMedia = selectedMedialist.Items.map((m: any) => ({
+				id: m.Id,
+				label: `${mlName} - ${m.MediaName}`,
+			}))
+			if (nextSelectedMedia.length === 0) {
+				nextSelectedMedia.push({ id: 'None', label: 'None' })
+			}
+		} else {
+			nextSelectedMedia = [{ id: 'None', label: 'None' }]
+		}
+		if (JSON.stringify(self.CHOICES_MEDIALIST_SELECTED_MEDIA) !== JSON.stringify(nextSelectedMedia)) {
+			self.CHOICES_MEDIALIST_SELECTED_MEDIA = nextSelectedMedia
+			self.updateActions()
+			self.updateFeedbacks()
+		}
 		await updateVariable(self, 'medialistSelectedName', selectedMedialist.Name || '')
 		await updateVariable(self, 'medialistSelectedId', selectedMedialist.Id || '')
 	} else {
@@ -401,20 +508,20 @@ async function pollMedialist(self: MulticamInstance) {
 	}
 }
 
-async function pollPublisher(self: MulticamInstance) {
+async function pollPublisher(_self: MulticamInstance) {
 	//self.log('info', 'Polling publisher - not yet implemented')
 }
 
-async function pollRadio(self: MulticamInstance) {
+async function pollRadio(_self: MulticamInstance) {
 	//self.log('info', 'Polling radio - not yet implemented')
 }
 
-async function pollRecording(self: MulticamInstance) {
+async function pollRecording(_self: MulticamInstance) {
 	//self.log('info', 'Polling recording - not yet implemented')
 }
 
 async function pollScenes(self: MulticamInstance) {
-	self.log('info', 'Polling scenes')
+	self.log('debug', 'Polling scenes')
 
 	//get scenes files
 	const sceneFiles = await fetchData(self, '/api/v2/scenes/files')
@@ -495,10 +602,25 @@ async function pollScenes(self: MulticamInstance) {
 }
 
 async function pollStreaming(self: MulticamInstance) {
-	//self.log('info', 'Polling streaming - not yet implemented')
+	self.log('debug', 'Polling streaming')
+	const streamingCatalogs = await fetchData(self, '/api/v2/streaming/catalogs')
+	if (streamingCatalogs) {
+		if (JSON.stringify(self.CHOICES_STREAMING_CATALOGS) !== JSON.stringify(streamingCatalogs)) {
+			self.CHOICES_STREAMING_CATALOGS = streamingCatalogs.map((c: any) => ({ id: c.Id, label: c.Name }))
+			self.updateActions()
+		}
+	}
+
+	const streamingProfiles = await fetchData(self, '/api/v2/streaming/selected/profiles')
+	if (streamingProfiles) {
+		if (JSON.stringify(self.CHOICES_STREAMING_PROFILES) !== JSON.stringify(streamingProfiles)) {
+			self.CHOICES_STREAMING_PROFILES = streamingProfiles.map((p: any) => ({ id: p.Id, label: p.Name }))
+			self.updateActions()
+		}
+	}
 }
 
-async function pollStudio(self: MulticamInstance) {
+async function pollStudio(_self: MulticamInstance) {
 	//self.log('info', 'Polling studio - not yet implemented')
 }
 
@@ -710,14 +832,14 @@ async function pollTitler(self: MulticamInstance) {
 	}
 }
 
-async function pollVideo(self: MulticamInstance) {
+async function pollVideo(_self: MulticamInstance) {
 	//self.log('info', 'Polling video - not yet implemented')
 }
 
-export async function updateVariable(self: MulticamInstance, varName: string, value: any) {
+export async function updateVariable(self: MulticamInstance, varName: string, value: unknown): Promise<void> {
 	const variableObj: any = {}
 	variableObj[varName] = value
-	await self.setVariableValues(variableObj)
+	self.setVariableValues(variableObj)
 }
 
 async function fetchData(self: MulticamInstance, endpoint: string, method?: string, payload?: any): Promise<any> {
@@ -733,7 +855,7 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 				method = 'GET'
 			}
 
-			let headers: any = {
+			const headers: any = {
 				'Content-Type': 'application/json',
 			}
 
@@ -761,16 +883,25 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 			const raw = await response.text()
 
 			if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
-				return JSON.parse(raw)
+				const parsed = JSON.parse(raw)
+				markFetchSucceeded(self)
+				return parsed
 			} else {
-				return raw.trim()
+				const trimmed = raw.trim()
+				markFetchSucceeded(self)
+				return trimmed
 			}
 		} else {
 			self.log('error', 'Invalid host or port configuration')
 			return null
 		}
 	} catch (error: any) {
-		self.log('error', `Failed to fetch data: ${error.message || error}`)
+		const message = String(error?.message ?? error)
+		const dedupe = getFetchErrorDedupeState(self)
+		if (dedupe.suppressDuplicateMessage !== message) {
+			self.log('error', `Failed to fetch data: ${message}`)
+			dedupe.suppressDuplicateMessage = message
+		}
 		return null
 	}
 }

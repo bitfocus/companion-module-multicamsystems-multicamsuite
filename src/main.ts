@@ -7,11 +7,23 @@ import { UpdateVariableDefinitions } from './variables.js'
 import { InitConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
 
+export interface StreamingProfile {
+	id: string
+	name: string
+	isEnabled: boolean
+	broadcastServerHostname: string
+	broadcastStreamID: string
+	isStarted: boolean
+	canBeLaunchedRemotely: boolean
+	errorMessage: string
+}
+
 export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	config!: ModuleConfig // Setup in init()
 	CHOICES_APPLICATIONS: { id: string; label: string }[]
 	APPLICATIONS: any[] = [] //list of licensed applications
 	ROOMS: any[] = [] //list of rooms
+	CHOICES_ROOMS: { id: string; label: string }[] = [] //choices for rooms
 	ROOM_SELECTED: any = {} //currently selected room
 	AUDIO_PROFILES: any[] = [] //list of audio profiles
 	AUDIO_PROFILE_SELECTED: any = {} //currently selected audio profile
@@ -30,6 +42,8 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_VIDEO_SOURCES: { id: string; label: string }[] = []
 
 	CHOICES_MEDIALIST_SELECTED_MEDIA: { id: string; label: string }[] = [] //choices for media in selected medialist
+	/** All media in all medialists; id is `medialistId|mediaId`, label `Medialist Name - Media Name`. */
+	CHOICES_MEDIALISTS_MEDIA: { id: string; label: string }[] = []
 	MEDIALISTS: any[] = [] //list of medialists
 	CHOICES_MEDIALISTS: { id: string; label: string }[] = [] //choices for medialists
 	MEDIALIST_SELECTED: any = {} //currently selected medialist
@@ -56,6 +70,10 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	CHOICES_TITLER_ELEMENTS: { id: string; label: string }[] = [] //choices for titler elements
 	CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS: { id: string; label: string }[] = [] //choices for titler elements speaker rows
 	CHOICES_TITLER_ELEMENTS_PANEL_ROWS: { id: string; label: string }[] = [] //choices for titler elements panel rows
+
+	//STATUS
+	RECORDING: boolean = false //recording is currently active
+	ACTIVE_STREAMS: StreamingProfile[] = [] //profiles in the selected streaming catalog
 
 	pollInterval: NodeJS.Timeout | null = null
 	_signalR: signalR.HubConnection | null = null
@@ -130,6 +148,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		] //choices for video sources (cameras, screen captures, etc.)
 
 		this.CHOICES_MEDIALIST_SELECTED_MEDIA = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_MEDIALISTS_MEDIA = [{ id: 'None', label: 'None' }]
 
 		this.CHOICES_RADIO_PRESET_BANKS = [{ id: 'none', label: 'None' }] //default value
 

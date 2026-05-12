@@ -4,6 +4,7 @@ import type { MulticamInstance } from './main.js'
 export function UpdateFeedbacks(self: MulticamInstance): void {
 	const COLOR_WHITE = combineRgb(255, 255, 255)
 	const COLOR_GREEN = combineRgb(0, 255, 0)
+	const COLOR_RED = combineRgb(255, 0, 0)
 
 	const feedbacks: CompanionFeedbackDefinitions = {}
 
@@ -241,5 +242,42 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 		},
 	}
 
+	//recording
+	feedbacks.recording = {
+		type: 'boolean',
+		name: 'RECORDING | Recording is currently active',
+		description: 'If the recording is currently active, change color',
+		options: [],
+		defaultStyle: {
+			color: COLOR_WHITE,
+			bgcolor: COLOR_RED,
+		},
+		callback: () => {
+			return self.getVariableValue('recording') === true
+		},
+	}
+
+	//streaming
+	feedbacks.streaming = {
+		type: 'boolean',
+		name: 'STREAMING | Streaming is currently active',
+		description: 'If the streaming is currently active, change color',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'streamingProfileId',
+				label: 'Streaming Profile',
+				default: self.CHOICES_STREAMING_PROFILES[0]?.id || '',
+				choices: self.CHOICES_STREAMING_PROFILES,
+			},
+		],
+		defaultStyle: {
+			color: COLOR_WHITE,
+			bgcolor: COLOR_GREEN,
+		},
+		callback: (feedback) => {
+			return self.ACTIVE_STREAMS.some((p) => p.id === feedback.options.streamingProfileId)
+		},
+	}
 	self.setFeedbackDefinitions(feedbacks)
 }

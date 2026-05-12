@@ -3,6 +3,7 @@ import { CompanionActionDefinitions } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 
 import { SendCommand } from './api.js'
+import { runPollCycle, parseMedialistMediaGlobalChoiceId } from './polling.js'
 
 export function UpdateActions(self: MulticamInstance): void {
 	const actions: CompanionActionDefinitions = {}
@@ -71,11 +72,11 @@ export function UpdateActions(self: MulticamInstance): void {
 				required: true,
 			},
 			{
-				type: 'textinput',
-				label: 'Room ID',
+				type: 'dropdown',
+				label: 'Room',
 				id: 'roomId',
-				default: '',
-				required: true,
+				default: self.CHOICES_ROOMS[0]?.id || '',
+				choices: self.CHOICES_ROOMS,
 			},
 			{
 				type: 'checkbox',
@@ -437,7 +438,7 @@ export function UpdateActions(self: MulticamInstance): void {
 
 	//MEDIALIST
 	actions.medialistSelect = {
-		name: 'Medialist - Select',
+		name: 'MEDIALIST | Select',
 		description: 'Select a Medialist',
 		options: [
 			{
@@ -450,11 +451,93 @@ export function UpdateActions(self: MulticamInstance): void {
 		],
 		callback: async (action) => {
 			await SendCommand(self, `/api/v3/medialist/selected/${action.options.medialist}/select`, 'POST')
+			//Sync medialist items after selection
+			void runPollCycle(self)
+		},
+	}
+
+	//Selected Medialist Commands
+	actions.medialistPlay = {
+		name: 'MEDIALIST | Selected Medialist - Play',
+		description: 'Plays the currently selected Medialist',
+		options: [],
+		callback: async () => {
+			await SendCommand(self, `/api/v3/medialist/selected/play`, 'POST')
+		},
+	}
+
+	actions.medialistStop = {
+		name: 'MEDIALIST | Selected Medialist - Stop',
+		description: 'Stops the currently selected Medialist',
+		options: [],
+		callback: async () => {
+			await SendCommand(self, `/api/v3/medialist/selected/stop`, 'POST', true)
+		},
+	}
+
+	actions.medialistPause = {
+		name: 'MEDIALIST | Selected Medialist - Pause',
+		description: 'Pauses the currently selected Medialist',
+		options: [],
+		callback: async () => {
+			await SendCommand(self, `/api/v3/medialist/selected/pause`, 'POST')
+		},
+	}
+
+	actions.medialistMoveUp = {
+		name: 'MEDIALIST | Selected Medialist - Move Up',
+		description: 'Moves a media item up in the selected Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Media',
+				id: 'mediaId',
+				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+			},
+		],
+		callback: async (action) => {
+			await SendCommand(self, `/api/v3/medialist/selected/${action.options.mediaId}/moveup`, 'POST')
+		},
+	}
+
+	actions.medialistMoveDown = {
+		name: 'MEDIALIST | Selected Medialist - Move Down',
+		description: 'Moves a media item down in the selected Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Media',
+				id: 'mediaId',
+				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+			},
+		],
+		callback: async (action) => {
+			await SendCommand(self, `/api/v3/medialist/selected/${action.options.mediaId}/movedown`, 'POST')
+		},
+	}
+
+	actions.medialistPlayMedia = {
+		name: 'MEDIALIST | Selected Medialist - Select and Play Media',
+		description: 'Selects and plays the specified media in the selected Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Media',
+				id: 'mediaId',
+				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/play`, 'POST')
 		},
 	}
 
 	actions.medialistAddMedia = {
-		name: 'Medialist - Add Media',
+		name: 'MEDIALIST | Selected Medialist - Add Media',
 		description: 'Adds a media to the selected Medialist',
 		options: [
 			{
@@ -470,64 +553,67 @@ export function UpdateActions(self: MulticamInstance): void {
 		},
 	}
 
-	actions.medialistPlay = {
-		name: 'Medialist - Play',
-		description: 'Plays the currently selected Medialist',
-		options: [],
-		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/play`, 'POST')
-		},
-	}
-
-	actions.medialistStop = {
-		name: 'Medialist - Stop',
-		description: 'Stops the currently selected Medialist',
-		options: [],
-		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/stop`, 'POST')
-		},
-	}
-
-	actions.medialistPause = {
-		name: 'Medialist - Pause',
-		description: 'Pauses the currently selected Medialist',
-		options: [],
-		callback: async () => {
-			await SendCommand(self, `/api/v3/medialist/selected/pause`, 'POST')
-		},
-	}
-
-	actions.medialistMoveUp = {
-		name: 'Medialist - Move Up (Selected)',
-		description: 'Moves a media item up in the selected Medialist',
+	//Custom Medialist Commands
+	actions.medialistPlayCustom = {
+		name: 'MEDIALIST | Custom Medialist - Play',
+		description: 'Plays the specified Medialist',
 		options: [
 			{
 				type: 'dropdown',
-				label: 'Media',
-				id: 'mediaId',
-				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
-				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+				label: 'Medialist',
+				id: 'medialistId',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `medialist/selected/${action.options.mediaId}/moveup`)
+			const medialistId = action.options.medialistId as string
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/play`, 'POST')
 		},
 	}
 
-	actions.medialistMoveDown = {
-		name: 'Medialist - Move Down (Selected)',
-		description: 'Moves a media item down in the selected Medialist',
+	actions.medialistPlayMediaCustom = {
+		name: 'MEDIALIST | Custom Medialist - Select and Play Media',
+		description: 'Selects and plays the specified media in the specified Medialist',
 		options: [
 			{
 				type: 'dropdown',
-				label: 'Media',
-				id: 'mediaId',
-				default: self.CHOICES_MEDIALIST_SELECTED_MEDIA[0]?.id || '',
-				choices: self.CHOICES_MEDIALIST_SELECTED_MEDIA,
+				label: 'Medialist / Media',
+				id: 'medialistMedia',
+				default: self.CHOICES_MEDIALISTS_MEDIA[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS_MEDIA,
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `medialist/selected/${action.options.mediaId}/movedown`)
+			const parsed = parseMedialistMediaGlobalChoiceId(String(action.options.medialistMedia ?? ''))
+			if (!parsed) return
+			await SendCommand(self, `/api/v3/medialist/${parsed.medialistId}/${parsed.mediaId}`, 'POST')
+		},
+	}
+
+	actions.medialistPlayMediaCustomByIndex = {
+		name: 'MEDIALIST | Custom Medialist - Select and Play Media By Index',
+		description: 'Selects and plays the specified media in the specified Medialist',
+		options: [
+			{
+				type: 'dropdown',
+				label: 'Medialist',
+				id: 'medialistId',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
+			},
+			{
+				type: 'textinput',
+				label: 'Media Index',
+				id: 'mediaIndex',
+				default: '0',
+				useVariables: true,
+			},
+		],
+		callback: async (action) => {
+			const medialistId = action.options.medialistId as string
+			const mediaIndex = await self.parseVariablesInString(String(action.options.mediaIndex))
+			await SendCommand(self, `/api/v3/medialist/${medialistId}/${mediaIndex}`, 'POST')
 		},
 	}
 
@@ -716,19 +802,19 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, 'radio/automation/variables')
 		},
 	}
-
+	*/
 	//RECORDING
 	actions.recordingStart = {
-		name: 'Recording - Start',
+		name: 'RECORDING | Start',
 		description: 'Starts recording using the currently launched application',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/start')
+			await SendCommand(self, '/api/recording/start', 'POST')
 		},
 	}
 
 	actions.recordingStartDuration = {
-		name: 'Recording - Start (Duration)',
+		name: 'RECORDING | Start (Duration)',
 		description: 'Starts recording for a set duration using the currently launched app',
 		options: [
 			{
@@ -740,12 +826,13 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `api/recording/start/${action.options.duration}`)
+			const duration = encodeURIComponent(String(action.options.duration ?? ''))
+			await SendCommand(self, `/api/recording/start/${duration}`, 'POST')
 		},
 	}
 
-	actions.recordingStartTracking = {
-		name: 'Recording - Start (Tracking)',
+	/* actions.recordingStartTracking = {
+		name: 'RECORDING | Start (Tracking)',
 		description: 'Starts recording using the Tracking application',
 		options: [
 			{
@@ -760,28 +847,28 @@ export function UpdateActions(self: MulticamInstance): void {
 			const duration = await self.parseVariablesInString(String(action.options.duration))
 			await SendCommand(self, 'api/recording/startRecording', 'POST', duration)
 		},
-	}
+	} */
 
 	actions.recordingStop = {
-		name: 'Recording - Stop',
+		name: 'RECORDING | Stop',
 		description: 'Stops the current recording',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/stop')
+			await SendCommand(self, '/api/recording/stop', 'POST')
 		},
 	}
 
 	actions.recordingPause = {
-		name: 'Recording - Pause/Resume',
+		name: 'RECORDING | Pause/Resume',
 		description: 'Pauses or resumes the current recording',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'api/recording/pause')
+			await SendCommand(self, '/api/recording/pause', 'POST')
 		},
 	}
 
-	actions.recordingLiveExtract = {
-		name: 'Recording - Live Extract Start/Stop',
+	/* actions.recordingLiveExtract = {
+		name: 'RECORDING | Live Extract Start/Stop',
 		description: 'Starts or stops a live extract recording',
 		options: [
 			{
@@ -806,27 +893,62 @@ export function UpdateActions(self: MulticamInstance): void {
 			)
 		},
 	}
+	*/
 
-	actions.recordingAuxStart = {
-		name: 'Recording - Start Aux',
-		description: 'Starts all configured auxiliary recordings',
+	actions.recordingIsoStart = {
+		name: 'RECORDING | Start All ISO Recordings',
+		description: 'Starts all configured ISO recordings',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'recording/aux/start')
+			await SendCommand(self, `/api/recording/aux/start`, 'POST')
 		},
 	}
 
-	actions.recordingAuxStop = {
-		name: 'Recording - Stop Aux',
-		description: 'Stops all configured auxiliary recordings',
+	actions.recordingIsoStop = {
+		name: 'RECORDING | Stop All ISO Recordings',
+		description: 'Stops all configured ISO recordings',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'recording/aux/stop')
+			await SendCommand(self, `/api/recording/aux/stop`, 'POST')
 		},
 	}
 
-	actions.recordingSplit = {
-		name: 'Recording - Split',
+	actions.recordingIsoStartSource = {
+		name: 'RECORDING | Start ISO Recording',
+		description: 'Starts an ISO recording',
+		options: [
+			{
+				type: 'textinput',
+				label: 'Source',
+				id: 'camId',
+				default: 'CAM1',
+			},
+		],
+		callback: async (action) => {
+			const camId = encodeURIComponent(String(action.options.camId ?? ''))
+			await SendCommand(self, `/api/recording/aux/start/${camId}`, 'POST')
+		},
+	}
+
+	actions.recordingIsoStopSource = {
+		name: 'RECORDING | Stop ISO Recording',
+		description: 'Stops an ISO recording',
+		options: [
+			{
+				type: 'textinput',
+				label: 'Source',
+				id: 'camId',
+				default: 'CAM1',
+			},
+		],
+		callback: async (action) => {
+			const camId = encodeURIComponent(String(action.options.camId ?? ''))
+			await SendCommand(self, `/api/recording/aux/stop/${camId}`, 'POST')
+		},
+	}
+
+	/* actions.recordingSplit = {
+		name: 'RECORDING | Split',
 		description: 'Updates the split settings',
 		options: [
 			{
@@ -841,7 +963,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			const duration = await self.parseVariablesInString(String(action.options.duration))
 			await SendCommand(self, `/api/recording/split?newSplitDuration=${duration}`, 'POST')
 		},
-	}*/
+	} */
 
 	//SCENES
 
@@ -878,10 +1000,10 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, `/api/v2/scenes/selected/${action.options.sceneId}/take`, 'POST')
 		},
 	}
-	/*
+
 	//STREAMING
 	actions.selectStreamingCatalog = {
-		name: 'Streaming - Select Catalog',
+		name: 'STREAMING | Select Catalog',
 		options: [
 			{
 				type: 'dropdown',
@@ -892,28 +1014,28 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/${action.options.catalogId}`)
+			await SendCommand(self, `/api/v2/streaming/selected/${action.options.catalogId}`, 'POST')
 		},
 	}
 
 	actions.streamingStartAll = {
-		name: 'Streaming - Start All Profiles in Selected Catalog',
+		name: 'STREAMING | Start All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v2/streaming/selected/profiles/startall`)
+			await SendCommand(self, `/api/v2/streaming/selected/profiles/startall`, 'POST')
 		},
 	}
 
 	actions.streamingStopAll = {
-		name: 'Streaming - Stop All Profiles in Selected Catalog',
+		name: 'STREAMING | Stop All Profiles in Selected Catalog',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/v2/streaming/selected/profiles/stopall`)
+			await SendCommand(self, `/api/v2/streaming/selected/profiles/stopall`, 'POST')
 		},
 	}
 
 	actions.streamingStartProfile = {
-		name: 'Streaming - Start Profile',
+		name: 'STREAMING | Start Profile',
 		options: [
 			{
 				type: 'dropdown',
@@ -924,12 +1046,12 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/start`)
+			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/start`, 'POST')
 		},
 	}
 
 	actions.streamingStopProfile = {
-		name: 'Streaming - Stop Profile',
+		name: 'STREAMING | Stop Profile',
 		options: [
 			{
 				type: 'dropdown',
@@ -940,11 +1062,11 @@ export function UpdateActions(self: MulticamInstance): void {
 			},
 		],
 		callback: async (action) => {
-			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/stop`)
+			await SendCommand(self, `/api/v2/streaming/selected/profile/${action.options.profileId}/stop`, 'POST')
 		},
 	}
 
-	//STUDIO
+	/* 	//STUDIO
 
 	actions.storePreset = {
 		name: 'Studio - Store Preset',
@@ -981,8 +1103,7 @@ export function UpdateActions(self: MulticamInstance): void {
 			await SendCommand(self, `/api/studio/autoframe/${action.options.cameraIndex}`)
 		},
 	}
-		*/
-
+ */
 	//SYSTEM
 
 	actions.shutdownSystem = {
@@ -1093,35 +1214,46 @@ export function UpdateActions(self: MulticamInstance): void {
 		},
 	}
 
-	/*
 	//VIDEO
-
 	actions.videoChangeLiveSource = {
-		name: 'Video - Change Live Source',
+		name: 'VIDEO | Change Live Source',
 		description: 'Changes the live video source.',
 		options: [
 			{
 				type: 'textinput',
-				label: "Name of the source (ie 'Source 1' or 'PC Input' or 'Medialist')",
+				label: 'Source Name',
 				id: 'sourceName',
 				default: 'Source 1',
 				required: true,
+				tooltip: '(ie "Source 1" or "PC Input" or "Medialist")',
 			},
 		],
 		callback: async (action) => {
-			const sourceName = await self.parseVariablesInString(String(action.options.sourceName))
-			await SendCommand(self, `/api/video/live/source/${sourceName}`)
+			const parsedName = await self.parseVariablesInString(String(action.options.sourceName))
+			const sourceName = encodeURIComponent(String(parsedName ?? ''))
+			await SendCommand(self, `/api/video/live/${sourceName}`, 'POST')
 		},
 	}
 
 	actions.videoRestartOutput = {
-		name: 'Video - Restart Output',
+		name: 'VIDEO | Restart Output',
 		description: 'Restarts the video output.',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, `/api/video/restartoutput`)
+			await SendCommand(self, `/api/video/restartoutput`, 'POST')
 		},
 	}
-*/
+
+	//Manual Poll
+	actions.manualPoll = {
+		name: 'APPLICATION | Manually Refresh Data',
+		description: 'Manually poll the application to update data.',
+		options: [],
+		callback: async () => {
+			void runPollCycle(self)
+			self.log('info', 'Manual poll completed')
+		},
+	}
+
 	self.setActionDefinitions(actions)
 }

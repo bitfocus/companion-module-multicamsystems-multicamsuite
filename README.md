@@ -1,4 +1,3 @@
-# companion-module-Multicam-Suite
+# companion-module-multicamsystems-multicamsuite
 
-Multicam Systems module companion
-Remotely control your Multicam system using our web API.
+See [HELP.md](./HELP.md) and [LICENSE](./LICENSE)
