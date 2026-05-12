@@ -893,26 +893,61 @@ export function UpdateActions(self: MulticamInstance): void {
 			)
 		},
 	}
+	*/
 
-	actions.recordingAuxStart = {
-		name: 'RECORDING | Start Aux',
-		description: 'Starts all configured auxiliary recordings',
+	actions.recordingIsoStart = {
+		name: 'RECORDING | Start All ISO Recordings',
+		description: 'Starts all configured ISO recordings',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'recording/aux/start')
+			await SendCommand(self, `/api/recording/aux/start`, 'POST')
 		},
 	}
 
-	actions.recordingAuxStop = {
-		name: 'RECORDING | Stop Aux',
-		description: 'Stops all configured auxiliary recordings',
+	actions.recordingIsoStop = {
+		name: 'RECORDING | Stop All ISO Recordings',
+		description: 'Stops all configured ISO recordings',
 		options: [],
 		callback: async () => {
-			await SendCommand(self, 'recording/aux/stop')
+			await SendCommand(self, `/api/recording/aux/stop`, 'POST')
 		},
 	}
 
-	actions.recordingSplit = {
+	actions.recordingIsoStartSource = {
+		name: 'RECORDING | Start ISO Recording',
+		description: 'Starts an ISO recording',
+		options: [
+			{
+				type: 'textinput',
+				label: 'Source',
+				id: 'camId',
+				default: 'CAM1',
+			},
+		],
+		callback: async (action) => {
+			const camId = encodeURIComponent(String(action.options.camId ?? ''))
+			await SendCommand(self, `/api/recording/aux/start/${camId}`, 'POST')
+		},
+	}
+
+	actions.recordingIsoStopSource = {
+		name: 'RECORDING | Stop ISO Recording',
+		description: 'Stops an ISO recording',
+		options: [
+			{
+				type: 'textinput',
+				label: 'Source',
+				id: 'camId',
+				default: 'CAM1',
+			},
+		],
+		callback: async (action) => {
+			const camId = encodeURIComponent(String(action.options.camId ?? ''))
+			await SendCommand(self, `/api/recording/aux/stop/${camId}`, 'POST')
+		},
+	}
+
+	/* actions.recordingSplit = {
 		name: 'RECORDING | Split',
 		description: 'Updates the split settings',
 		options: [
