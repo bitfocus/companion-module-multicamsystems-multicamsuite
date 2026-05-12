@@ -50,6 +50,10 @@ This module will communicate with Multicam Systems' Multicam Suite software.
 - Recording - Start (Duration)
 - Recording - Pause/Resume
 - Recording - Stop
+- Recording - Start All ISO Recordings
+- Recording - Stop All ISO Recordings
+- Recording - Start ISO Recording
+- Recording - Stop ISO Recording
 
 ### Scenes
 
