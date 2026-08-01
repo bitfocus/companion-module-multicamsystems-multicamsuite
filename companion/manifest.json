@@ -1,4 +1,6 @@
 {
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+	"type": "connection",
 	"id": "multicamsystems-multicamsuite",
 	"name": "multicamsystems-multicamsuite",
 	"shortname": "mcs",
@@ -15,6 +17,10 @@
 		{
 			"name": "Bryce Seifert",
 			"email": "bryce@bitfocus.io"
+		},
+		{
+			"name": "Vincent Berry",
+			"email": "vincentberry@outlook.fr"
 		}
 	],
 	"legacyIds": [],
