@@ -472,21 +472,6 @@ export function UpdateActions(self: MulticamInstance): void {
 		self.log('error', `${label} is invalid. Refresh the module data and select it again.`)
 	}
 
-	function normalizeAutomationVariables(value: unknown): { Variables: { Key: string; Value: string }[] } | null {
-		if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-		const record = value as Record<string, unknown>
-		if (Array.isArray(record.Variables)) {
-			const variables = record.Variables.filter(
-				(item): item is { Key: string; Value: string } =>
-					typeof item === 'object' && item !== null && typeof item.Key === 'string' && typeof item.Value === 'string',
-			)
-			return { Variables: variables }
-		}
-		return {
-			Variables: Object.entries(record).map(([Key, item]) => ({ Key, Value: valueToString(item) })),
-		}
-	}
-
 	// APPLICATION
 	actions.applicationStart = {
 		name: 'APPLICATION | Start',
@@ -1094,41 +1079,6 @@ export function UpdateActions(self: MulticamInstance): void {
 					enabled: Boolean(action.options.override),
 				})}`,
 			),
-	}
-
-	actions.radioSetAutomationVariables = {
-		name: 'RADIO | Set Automation Variables',
-		description: 'Updates automation variables. Accepts either an object or the documented Variables payload.',
-		options: [
-			{
-				type: 'dropdown',
-				label: 'Update Mode',
-				id: 'mode',
-				default: 'PUT',
-				choices: [
-					{ id: 'PUT', label: 'Merge (keep undeclared variables)' },
-					{ id: 'POST', label: 'Replace (clear undeclared variables)' },
-				],
-			},
-			{
-				type: 'textinput',
-				label: 'Variables JSON',
-				id: 'variables',
-				default: '{"Example":"Value"}',
-				useVariables: true,
-				tooltip: 'Either {"Key":"Value"} or {"Variables":[{"Key":"Key","Value":"Value"}]}',
-			},
-		],
-		callback: async (action) => {
-			const parsed = await parseJsonOption<unknown>(self, action.options.variables, 'Automation variables')
-			if (parsed === undefined) return
-			const payload = normalizeAutomationVariables(parsed)
-			if (!payload) {
-				self.log('error', 'Automation variables JSON must be an object')
-				return
-			}
-			await sendAndRefresh(self, '/api/v2/radio/automation/variables', valueToString(action.options.mode), payload)
-		},
 	}
 
 	actions.radioClearAutomationVariables = {

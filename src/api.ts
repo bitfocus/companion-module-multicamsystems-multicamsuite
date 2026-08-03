@@ -3,43 +3,74 @@ import type { MulticamInstance } from './main.js'
 import { startPolling, stopPolling } from './polling.js'
 import { InitSignalR } from './signalr.js'
 
-export async function InitConnection(self: MulticamInstance, isCurrent: () => boolean = () => true): Promise<void> {
-	if (!isCurrent()) return
+const CONNECTION_PROBE_TIMEOUT_MS = 2000
+
+/**
+ * Lightweight health check used by both the initial connection and the reconnect supervisor.
+ * It intentionally doesn't log failures: while Multicam is offline, the supervisor owns the
+ * status and retry messages and avoids filling Companion's log on every probe.
+ */
+export async function ProbeConnection(
+	self: MulticamInstance,
+	timeoutMs: number = CONNECTION_PROBE_TIMEOUT_MS,
+): Promise<boolean> {
+	if (!self.config.host || !self.config.port) return false
+
+	const controller = new AbortController()
+	const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+	const headers: Record<string, string> = {
+		Accept: 'application/json',
+	}
+	if (self.config.specifyApiKey && self.secrets.apiKey) {
+		headers['x-apikey'] = self.secrets.apiKey
+	}
+
+	try {
+		const response = await fetch(`http://${self.config.host}:${self.config.port}/api/application/version`, {
+			method: 'GET',
+			headers,
+			signal: controller.signal,
+		})
+		await response.text()
+		return response.ok
+	} catch (_error) {
+		return false
+	} finally {
+		clearTimeout(timeoutId)
+	}
+}
+
+export async function InitConnection(self: MulticamInstance, isCurrent: () => boolean = () => true): Promise<boolean> {
+	if (!isCurrent()) return false
 	self.updateStatus(InstanceStatus.Connecting, 'Connecting...')
 
 	if (self.config.host && self.config.port) {
-		const cmd = `/api/application/version`
-
 		try {
-			const results = await Promise.race([
-				SendCommand(self, cmd),
-				timeout(2000), // 2 second timeout
-			])
-			if (!isCurrent()) return
+			const connected = await ProbeConnection(self)
+			if (!isCurrent()) return false
 
-			if (!results) {
+			if (!connected) {
 				self.updateStatus(InstanceStatus.ConnectionFailure, 'No response from Multicam')
 				stopPolling(self)
-				return
+				return false
 			}
 
 			self.updateStatus(InstanceStatus.Ok)
 			self.log('info', 'Connected successfully')
 			startPolling(self)
 			await InitSignalR(self)
+			return true
 		} catch (error: any) {
-			if (!isCurrent()) return
+			if (!isCurrent()) return false
 			self.log('error', `Connection failed: ${error.message || error}`)
 			self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - check IP')
 			stopPolling(self)
+			return false
 		}
 	} else if (isCurrent()) {
 		self.updateStatus(InstanceStatus.BadConfig, 'Missing host or port')
 	}
-}
-
-async function timeout(ms: number): Promise<never> {
-	return new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms))
+	return false
 }
 
 function formatApiError(result: unknown, statusText: string): string {

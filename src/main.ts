@@ -1,13 +1,19 @@
-import { InstanceBase, type SomeCompanionConfigField } from '@companion-module/base'
+import { InstanceBase, InstanceStatus, type SomeCompanionConfigField } from '@companion-module/base'
 import { GetConfigFields, type ModuleConfig, type ModuleSecrets } from './config.js'
 import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions, type ActionsSchema } from './actions.js'
 import { UpdateFeedbacks, type FeedbacksSchema } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
 import { UpdateVariableDefinitions, type VariablesSchema } from './variables.js'
-import { InitConnection } from './api.js'
+import { InitConnection, ProbeConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
 import { stopPolling } from './polling.js'
+import { cancelSignalRReconnect } from './signalr.js'
+
+const CONNECTION_HEALTH_CHECK_INTERVAL_MS = 5000
+const CONNECTION_HEALTH_FAILURE_THRESHOLD = 2
+const CONNECTION_RETRY_BASE_MS = 2000
+const CONNECTION_RETRY_MAX_MS = 30000
 
 export interface StreamingProfile {
 	id: string
@@ -158,6 +164,11 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 	_signalR: signalR.HubConnection | null = null
 	private connectionAttempt = 0
 	private isDestroyed = false
+	private reconnectTimer: NodeJS.Timeout | null = null
+	private healthCheckTimer: NodeJS.Timeout | null = null
+	private healthCheckInFlightForAttempt: number | null = null
+	private healthCheckFailures = 0
+	private connectionRetryCount = 0
 
 	constructor(internal: unknown) {
 		super(internal)
@@ -238,7 +249,9 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 		this.log('debug', 'destroy')
 		this.isDestroyed = true
 		this.connectionAttempt++
+		this.clearConnectionTimers()
 		stopPolling(this)
+		cancelSignalRReconnect(this)
 		if (this._signalR) {
 			const connection = this._signalR
 			this._signalR = null
@@ -276,17 +289,26 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 
 	private startConnection(): void {
 		const attempt = ++this.connectionAttempt
+		this.clearConnectionTimers()
+		this.connectionRetryCount = 0
+		stopPolling(this)
+		this.launchConnectionAttempt(attempt)
+	}
+
+	private launchConnectionAttempt(attempt: number): void {
 		void this.initConnection(attempt).catch((error) => {
-			if (!this.isDestroyed && attempt === this.connectionAttempt) {
+			if (this.isCurrentConnectionAttempt(attempt)) {
 				this.log('error', `Failed to initialize connection: ${error}`)
+				this.scheduleConnectionRetry(attempt)
 			}
 		})
 	}
 
 	private async initConnection(attempt: number): Promise<void> {
-		const isCurrent = (): boolean => !this.isDestroyed && attempt === this.connectionAttempt
+		const isCurrent = (): boolean => this.isCurrentConnectionAttempt(attempt)
 		if (!isCurrent()) return
 
+		cancelSignalRReconnect(this)
 		if (this._signalR) {
 			const connection = this._signalR
 			this._signalR = null
@@ -294,7 +316,93 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 			if (!isCurrent()) return
 		}
 
-		await InitConnection(this, isCurrent)
+		const connected = await InitConnection(this, isCurrent)
+		if (!isCurrent()) return
+
+		if (connected) {
+			this.connectionRetryCount = 0
+			this.startConnectionHealthCheck(attempt)
+		} else {
+			this.scheduleConnectionRetry(attempt)
+		}
+	}
+
+	private isCurrentConnectionAttempt(attempt: number): boolean {
+		return !this.isDestroyed && attempt === this.connectionAttempt
+	}
+
+	private scheduleConnectionRetry(attempt: number): void {
+		if (!this.isCurrentConnectionAttempt(attempt) || this.reconnectTimer || !this.config.host || !this.config.port) {
+			return
+		}
+
+		const delay = Math.min(
+			CONNECTION_RETRY_BASE_MS * 2 ** Math.min(this.connectionRetryCount, 4),
+			CONNECTION_RETRY_MAX_MS,
+		)
+		this.connectionRetryCount++
+		const delaySeconds = Math.ceil(delay / 1000)
+		this.updateStatus(InstanceStatus.ConnectionFailure, `Multicam unavailable - retrying in ${delaySeconds}s`)
+		this.log('warn', `Multicam unavailable; retrying /api/application/version in ${delaySeconds}s`)
+
+		this.reconnectTimer = setTimeout(() => {
+			this.reconnectTimer = null
+			if (this.isCurrentConnectionAttempt(attempt)) this.launchConnectionAttempt(attempt)
+		}, delay)
+	}
+
+	private startConnectionHealthCheck(attempt: number): void {
+		if (this.healthCheckTimer) clearInterval(this.healthCheckTimer)
+		this.healthCheckFailures = 0
+		this.healthCheckTimer = setInterval(() => {
+			void this.checkConnectionHealth(attempt)
+		}, CONNECTION_HEALTH_CHECK_INTERVAL_MS)
+	}
+
+	private async checkConnectionHealth(attempt: number): Promise<void> {
+		if (!this.isCurrentConnectionAttempt(attempt) || this.healthCheckInFlightForAttempt === attempt) return
+
+		this.healthCheckInFlightForAttempt = attempt
+		let connected = false
+		try {
+			connected = await ProbeConnection(this)
+		} finally {
+			if (this.healthCheckInFlightForAttempt === attempt) this.healthCheckInFlightForAttempt = null
+		}
+
+		if (!this.isCurrentConnectionAttempt(attempt)) return
+		if (connected) {
+			this.healthCheckFailures = 0
+			return
+		}
+
+		this.healthCheckFailures++
+		if (this.healthCheckFailures < CONNECTION_HEALTH_FAILURE_THRESHOLD) {
+			this.log('warn', 'Multicam health check failed once; waiting for confirmation')
+			return
+		}
+
+		this.log('warn', 'Connection to Multicam lost; starting automatic reconnection')
+		this.updateStatus(InstanceStatus.ConnectionFailure, 'Connection lost - reconnecting...')
+		if (this.healthCheckTimer) {
+			clearInterval(this.healthCheckTimer)
+			this.healthCheckTimer = null
+		}
+		stopPolling(this)
+		this.connectionRetryCount = 0
+		this.launchConnectionAttempt(attempt)
+	}
+
+	private clearConnectionTimers(): void {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer)
+			this.reconnectTimer = null
+		}
+		if (this.healthCheckTimer) {
+			clearInterval(this.healthCheckTimer)
+			this.healthCheckTimer = null
+		}
+		this.healthCheckFailures = 0
 	}
 }
 

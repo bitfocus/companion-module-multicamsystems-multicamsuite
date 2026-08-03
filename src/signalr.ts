@@ -88,6 +88,69 @@ const pendingRefreshes = new WeakMap<
 	MulticamInstance,
 	{ targets: Set<PollScope | 'all'>; forceSignalRRefresh: boolean }
 >()
+type SignalRReconnectState = {
+	timer: NodeJS.Timeout | null
+	attempts: number
+}
+const signalRReconnectStates = new WeakMap<MulticamInstance, SignalRReconnectState>()
+const SIGNALR_RETRY_BASE_MS = 2000
+const SIGNALR_RETRY_MAX_MS = 30000
+
+function getSignalRReconnectState(instance: MulticamInstance): SignalRReconnectState {
+	let state = signalRReconnectStates.get(instance)
+	if (!state) {
+		state = { timer: null, attempts: 0 }
+		signalRReconnectStates.set(instance, state)
+	}
+	return state
+}
+
+export function cancelSignalRReconnect(instance: MulticamInstance): void {
+	const state = signalRReconnectStates.get(instance)
+	if (state?.timer) clearTimeout(state.timer)
+	signalRReconnectStates.delete(instance)
+}
+
+function scheduleSignalRReconnect(instance: MulticamInstance, connection: signalR.HubConnection): void {
+	if (instance._signalR !== connection || connection.state !== signalR.HubConnectionState.Disconnected) return
+
+	const state = getSignalRReconnectState(instance)
+	if (state.timer) return
+	const delay = Math.min(SIGNALR_RETRY_BASE_MS * 2 ** Math.min(state.attempts, 4), SIGNALR_RETRY_MAX_MS)
+	state.attempts++
+	instance.log('warn', `SignalR unavailable; retrying in ${Math.ceil(delay / 1000)}s`)
+	state.timer = setTimeout(() => {
+		state.timer = null
+		if (instance._signalR !== connection || connection.state !== signalR.HubConnectionState.Disconnected) return
+		void startSignalRConnection(instance, connection)
+	}, delay)
+}
+
+async function startSignalRConnection(instance: MulticamInstance, connection: signalR.HubConnection): Promise<void> {
+	if (instance._signalR !== connection || connection.state !== signalR.HubConnectionState.Disconnected) return
+	const isRetry = getSignalRReconnectState(instance).attempts > 0
+
+	try {
+		await connection.start()
+		if (instance._signalR !== connection) {
+			await connection.stop()
+			return
+		}
+		cancelSignalRReconnect(instance)
+		setConnectionState(instance, true)
+		instance.log('info', isRetry ? 'SignalR reconnected' : 'SignalR connected')
+		await SyncSignalRState(instance)
+		if (isRetry && instance._signalR === connection) {
+			// SignalR events aren't replayed after a disconnect, so reconcile all state once.
+			await runPollCycle(instance, { forceSignalRRefresh: true })
+		}
+	} catch (error: any) {
+		if (instance._signalR !== connection) return
+		setConnectionState(instance, false)
+		instance.log('error', `SignalR failed to start: ${error?.message ?? error}`)
+		scheduleSignalRReconnect(instance, connection)
+	}
+}
 
 function isRecord(value: unknown): value is RecordLike {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -759,6 +822,7 @@ export async function SyncSignalRState(instance: MulticamInstance): Promise<void
 
 export async function InitSignalR(instance: MulticamInstance): Promise<void> {
 	instance.log('debug', 'Initializing SignalR connection')
+	cancelSignalRReconnect(instance)
 	setConnectionState(instance, false)
 
 	const url = `http://${instance.config.host}:${instance.config.port}/signalr`
@@ -780,6 +844,7 @@ export async function InitSignalR(instance: MulticamInstance): Promise<void> {
 		if (instance._signalR !== connection) return
 		setConnectionState(instance, false)
 		instance.log('warn', `SignalR closed: ${error?.message ?? 'no error'}`)
+		scheduleSignalRReconnect(instance, connection)
 	})
 	connection.onreconnecting((error) => {
 		if (instance._signalR !== connection) return
@@ -788,6 +853,7 @@ export async function InitSignalR(instance: MulticamInstance): Promise<void> {
 	})
 	connection.onreconnected((connectionId) => {
 		if (instance._signalR !== connection) return
+		cancelSignalRReconnect(instance)
 		setConnectionState(instance, true)
 		instance.log('info', `SignalR reconnected. connectionId=${connectionId ?? 'null'}`)
 		void (async () => {
@@ -797,17 +863,5 @@ export async function InitSignalR(instance: MulticamInstance): Promise<void> {
 		})()
 	})
 
-	try {
-		await connection.start()
-		if (instance._signalR !== connection) {
-			await connection.stop()
-			return
-		}
-		setConnectionState(instance, true)
-		instance.log('info', 'SignalR connected')
-		await SyncSignalRState(instance)
-	} catch (error: any) {
-		setConnectionState(instance, false)
-		instance.log('error', `SignalR failed to start: ${error?.message ?? error}`)
-	}
+	await startSignalRConnection(instance, connection)
 }
