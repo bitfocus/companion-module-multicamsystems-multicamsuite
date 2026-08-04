@@ -370,10 +370,10 @@ export function UpdatePresets(self: MulticamInstance): void {
 
 	presets.recordingStart = simplePreset({
 		name: 'RECORDING | Start',
-		text: 'RECORD\nSTART',
+		text: 'REC\nSTART',
 		actions: [presetAction('recordingStart')],
 		feedbacks: [presetFeedback('recording', {}, FEEDBACK_RED)],
-		color: COLOR_BLACK,
+		color: COLOR_WHITE,
 		bgcolor: COLOR_BLACK,
 	})
 	presets.recordingPause = simplePreset({
@@ -386,10 +386,10 @@ export function UpdatePresets(self: MulticamInstance): void {
 	})
 	presets.recordingStop = simplePreset({
 		name: 'RECORDING | Stop',
-		text: 'RECORD\nSTOP',
+		text: 'REC\nSTOP',
 		actions: [presetAction('recordingStop')],
 		feedbacks: [presetFeedback('recording', {}, FEEDBACK_RED)],
-		color: COLOR_BLACK,
+		color: COLOR_WHITE,
 		bgcolor: COLOR_BLACK,
 	})
 	const recordingSourceExpression = localExpression('source')
@@ -407,7 +407,7 @@ export function UpdatePresets(self: MulticamInstance): void {
 			name: 'RECORDING | Stop ISO Source',
 			text: 'ISO STOP\n$(local:source)',
 			actions: [presetAction('recordingIsoStopSource', { camId: recordingSourceExpression })],
-			color: COLOR_BLACK,
+			color: COLOR_WHITE,
 			bgcolor: COLOR_BLACK,
 		}),
 		localVariables: [{ variableType: 'simple', variableName: 'source', startupValue: 'Source 1' }],
