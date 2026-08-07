@@ -1,3 +1,4 @@
+import { InstanceStatus } from '@companion-module/base'
 import * as signalR from '@microsoft/signalr'
 import type { MulticamInstance, StreamingProfile } from './main.js'
 
@@ -9,26 +10,58 @@ function safeStringify(value: any): string {
 	}
 }
 
-export function InitSignalR(instance: MulticamInstance): void {
+/** Keep retrying forever while Multicam is offline (e.g. overnight reboot). */
+const SIGNALR_RECONNECT_DELAYS_MS = [0, 2000, 5000, 10000, 15000, 30000]
+
+export async function stopSignalR(instance: MulticamInstance): Promise<void> {
+	const existing = instance._signalR
+	instance._signalR = null
+	if (!existing) return
+
+	try {
+		await existing.stop()
+	} catch (e: any) {
+		instance.log('debug', `SignalR stop ignored: ${e?.message ?? e}`)
+	}
+}
+
+export function initSignalR(instance: MulticamInstance): void {
 	void (async () => {
 		instance.log('debug', 'Initializing SignalR connection')
+
+		await stopSignalR(instance)
 
 		const url = `http://${instance.config.host}:${instance.config.port}/signalr`
 
 		const connection = new signalR.HubConnectionBuilder()
 			.withUrl(url)
-			.withAutomaticReconnect()
+			.withAutomaticReconnect({
+				nextRetryDelayInMilliseconds: (retryContext) => {
+					const index = Math.min(retryContext.previousRetryCount, SIGNALR_RECONNECT_DELAYS_MS.length - 1)
+					return SIGNALR_RECONNECT_DELAYS_MS[index]
+				},
+			})
 			.configureLogging(signalR.LogLevel.Information)
 			.build()
 
 		connection.onclose((err) => {
 			instance.log('warn', `SignalR closed: ${err?.message ?? 'no error'}`)
+			// Only recover if this hub is still the active one (not an intentional stopSignalR)
+			if (instance._signalR === connection) {
+				instance._signalR = null
+				instance.updateStatus(InstanceStatus.ConnectionFailure, 'SignalR disconnected')
+				void import('./api.js').then(({ scheduleReconnect }) => {
+					scheduleReconnect(instance, 'SignalR disconnected')
+				})
+			}
 		})
 		connection.onreconnecting((err) => {
 			instance.log('warn', `SignalR reconnecting: ${err?.message ?? 'no error'}`)
+			instance.updateStatus(InstanceStatus.Connecting, 'SignalR reconnecting...')
 		})
 		connection.onreconnected((connectionId) => {
 			instance.log('info', `SignalR reconnected. connectionId=${connectionId ?? 'null'}`)
+			instance.updateStatus(InstanceStatus.Ok)
 		})
 
 		// --- IAssistHubToClient (server -> client) ---
@@ -270,13 +303,19 @@ export function InitSignalR(instance: MulticamInstance): void {
 		})
 
 		// ---- start ----
+		instance._signalR = connection
 		try {
 			await connection.start()
 			instance.log('info', 'SignalR connected')
 		} catch (e: any) {
 			instance.log('error', `SignalR failed to start: ${e?.message ?? e}`)
+			if (instance._signalR === connection) {
+				instance._signalR = null
+				instance.updateStatus(InstanceStatus.ConnectionFailure, 'SignalR failed to start')
+				void import('./api.js').then(({ scheduleReconnect }) => {
+					scheduleReconnect(instance, 'SignalR failed to start')
+				})
+			}
 		}
-
-		instance._signalR = connection
 	})()
 }

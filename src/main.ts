@@ -4,7 +4,7 @@ import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions } from './actions.js'
 import { UpdateFeedbacks } from './feedbacks.js'
 import { UpdateVariableDefinitions } from './variables.js'
-import { InitConnection } from './api.js'
+import { initConnection, stopConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
 
 export interface StreamingProfile {
@@ -76,6 +76,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	ACTIVE_STREAMS: StreamingProfile[] = [] //profiles in the selected streaming catalog
 
 	pollInterval: NodeJS.Timeout | null = null
+	reconnectTimer: NodeJS.Timeout | null = null
 	_signalR: signalR.HubConnection | null = null
 
 	constructor(internal: unknown) {
@@ -179,12 +180,14 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	// When module gets deleted
 	async destroy(): Promise<void> {
 		this.log('debug', 'destroy')
+		await stopConnection(this)
 	}
 
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
 
 		try {
+			await stopConnection(this)
 			await this.initConnection()
 		} catch (error) {
 			this.log('error', `Failed to initialize connection: ${error}`)
@@ -209,7 +212,7 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	}
 
 	async initConnection(): Promise<void> {
-		await InitConnection(this)
+		await initConnection(this)
 	}
 }
 

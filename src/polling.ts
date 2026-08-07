@@ -26,7 +26,7 @@ function markFetchSucceeded(self: MulticamInstance): void {
 }
 
 export function startPolling(self: MulticamInstance): void {
-	stopPolling()
+	stopPolling(self)
 
 	//poll once
 	void runPollCycle(self)
@@ -51,7 +51,12 @@ export function startPolling(self: MulticamInstance): void {
 	}
 }
 
-export function stopPolling(): void {
+export function stopPolling(self?: MulticamInstance): void {
+	if (self?.pollInterval) {
+		clearInterval(self.pollInterval)
+		self.pollInterval = null
+	}
+
 	if (pollInterval) {
 		clearInterval(pollInterval)
 		pollInterval = undefined
