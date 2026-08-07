@@ -2,27 +2,54 @@ import type { MulticamInstance } from './main.js'
 
 let pollInterval: NodeJS.Timeout | undefined = undefined
 
-/** Suppress repeated identical fetch errors (e.g. many endpoints failing when Multicam closes) until a request succeeds. */
-type FetchErrorDedupeState = {
+type PollLogState = {
+	/** Suppress repeated identical fetch errors (e.g. many endpoints failing when Multicam closes) until a request succeeds. */
 	suppressDuplicateMessage: string | null
+	/** Last message logged per status key, so unchanged state is only reported once. */
+	lastStatusByKey: Map<string, string>
 }
 
-const fetchErrorDedupeByInstance = new WeakMap<MulticamInstance, FetchErrorDedupeState>()
+const pollLogStateByInstance = new WeakMap<MulticamInstance, PollLogState>()
 
-function getFetchErrorDedupeState(self: MulticamInstance): FetchErrorDedupeState {
-	let s = fetchErrorDedupeByInstance.get(self)
+function getPollLogState(self: MulticamInstance): PollLogState {
+	let s = pollLogStateByInstance.get(self)
 	if (!s) {
-		s = { suppressDuplicateMessage: null }
-		fetchErrorDedupeByInstance.set(self, s)
+		s = { suppressDuplicateMessage: null, lastStatusByKey: new Map() }
+		pollLogStateByInstance.set(self, s)
 	}
 	return s
 }
 
 function markFetchSucceeded(self: MulticamInstance): void {
-	const s = fetchErrorDedupeByInstance.get(self)
+	const s = pollLogStateByInstance.get(self)
 	if (s) {
 		s.suppressDuplicateMessage = null
 	}
+}
+
+/** Per-cycle chatter, only emitted when verbose logging is enabled in the config. */
+function logVerbose(self: MulticamInstance, message: string): void {
+	if (self.config.verbose) {
+		self.log('debug', message)
+	}
+}
+
+/** Log a status message only when it differs from the last one logged for the same key. */
+function logStatusChange(self: MulticamInstance, key: string, message: string): void {
+	if (self.config.verbose) {
+		self.log('debug', message)
+		return
+	}
+
+	const state = getPollLogState(self)
+	if (state.lastStatusByKey.get(key) === message) return
+	state.lastStatusByKey.set(key, message)
+	self.log('debug', message)
+}
+
+/** Forget the last status for a key, so the same message is logged again if the state comes back. */
+function clearStatus(self: MulticamInstance, key: string): void {
+	getPollLogState(self).lastStatusByKey.delete(key)
 }
 
 export function startPolling(self: MulticamInstance): void {
@@ -88,7 +115,7 @@ export async function runPollCycle(self: MulticamInstance): Promise<void> {
 
 async function pollApplication(self: MulticamInstance) {
 	//get system information
-	self.log('debug', 'Polling application/system information')
+	logVerbose(self, 'Polling application/system information')
 
 	const data = await fetchData(self, '/api/application/system')
 	if (data) {
@@ -209,11 +236,12 @@ async function pollAudio(_self: MulticamInstance) {
 }
 
 async function pollComposer(self: MulticamInstance) {
-	self.log('debug', 'Polling Composer')
+	logVerbose(self, 'Polling Composer')
 
 	//get composer files
 	const files = await fetchData(self, '/api/v3/composer')
 	if (files && files !== 'Application not launched!') {
+		clearStatus(self, 'composerFiles')
 		self.COMPOSER_FILES = files
 
 		//console.log('files', files)
@@ -233,7 +261,7 @@ async function pollComposer(self: MulticamInstance) {
 			self.updateFeedbacks()
 		}
 	} else {
-		self.log('debug', 'Unable to fetch composer files, application not launched')
+		logStatusChange(self, 'composerFiles', 'Unable to fetch composer files, application not launched')
 	}
 
 	//get selected composer file
@@ -242,10 +270,13 @@ async function pollComposer(self: MulticamInstance) {
 		self.COMPOSER_FILE_SELECTED = selectedFile.ComposerFileId
 		await updateVariable(self, 'composerSelectedFileName', selectedFile.ComposerFileName || '')
 		await updateVariable(self, 'composerSelectedFileId', selectedFile.ComposerFileId || '')
-		self.log('debug', `Selected composer file ID: ${selectedFile.ComposerFileId}`)
-		self.log('debug', `Selected composer file Name: ${selectedFile.ComposerFileName}`)
+		logStatusChange(
+			self,
+			'composerSelectedFile',
+			`Selected composer file: ${selectedFile.ComposerFileName} (${selectedFile.ComposerFileId})`,
+		)
 	} else {
-		self.log('debug', 'Unable to fetch selected composer file, application not launched')
+		logStatusChange(self, 'composerSelectedFile', 'Unable to fetch selected composer file, application not launched')
 	}
 
 	//get selected composer file's content
@@ -256,13 +287,17 @@ async function pollComposer(self: MulticamInstance) {
 
 			//console.log('content', content)
 
+			clearStatus(self, 'composerFileContent')
+
 			//build CHOICES_COMPOSER_COMPOSITIONS
 			const choices = content.map((c: any) => {
 				return { id: c.ComposerSceneId, label: c.ComposerSceneName }
 			})
 			if (choices.length === 0) {
-				self.log('debug', 'No compositions found in selected composer file')
+				logStatusChange(self, 'composerCompositions', 'No compositions found in selected composer file')
 				choices.push({ id: 'None', label: 'None' })
+			} else {
+				clearStatus(self, 'composerCompositions')
 			}
 
 			//console.log('CHOICES_COMPOSER_COMPOSITIONS:', choices)
@@ -290,8 +325,10 @@ async function pollComposer(self: MulticamInstance) {
 			}
 
 			if (tempChoicesElements.length === 0) {
-				self.log('debug', 'No composition elements found in selected composer file')
+				logStatusChange(self, 'composerCompositionElements', 'No composition elements found in selected composer file')
 				tempChoicesElements.push({ id: 'None', label: 'None' })
+			} else {
+				clearStatus(self, 'composerCompositionElements')
 			}
 
 			//console.log('CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS:', tempChoicesElements)
@@ -303,21 +340,26 @@ async function pollComposer(self: MulticamInstance) {
 				self.updateFeedbacks()
 			}
 		} else {
-			self.log('debug', 'Unable to fetch composer file elements, no file selected')
+			logStatusChange(self, 'composerFileContent', 'Unable to fetch composer file elements, no file selected')
 		}
 	} else {
-		self.log('debug', 'Unable to fetch composer file content, application not launched')
+		logStatusChange(self, 'composerFileContent', 'Unable to fetch composer file content, application not launched')
 	}
 
 	//get selected composition
 	const composition = await fetchData(self, '/api/v3/composer/selected/compositions/selected')
 	if (composition && composition !== 'Application not launched!') {
+		clearStatus(self, 'composerSelectedComposition')
 		self.COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION = composition
 		self.COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION_ID = composition.CompositionSceneId || ''
 		await updateVariable(self, 'composerSelectedCompositionSceneName', composition.CompositionSceneName || '')
 		await updateVariable(self, 'composerSelectedCompositionSceneId', composition.CompositionSceneId || '')
 	} else {
-		self.log('debug', 'Unable to fetch selected composition, application not launched')
+		logStatusChange(
+			self,
+			'composerSelectedComposition',
+			'Unable to fetch selected composition, application not launched',
+		)
 	}
 }
 
@@ -428,13 +470,14 @@ async function buildMedialistsMediaChoices(
 }
 
 async function pollMedialist(self: MulticamInstance) {
-	self.log('debug', 'Polling Medialist')
+	logVerbose(self, 'Polling Medialist')
 
 	//get available medialists
 	//api/v3/medialist
 
 	const medialists = await fetchData(self, '/api/v3/medialist')
 	if (medialists && medialists !== 'Application not launched!') {
+		clearStatus(self, 'medialists')
 		self.MEDIALISTS = medialists
 
 		self.checkFeedbacks()
@@ -462,7 +505,7 @@ async function pollMedialist(self: MulticamInstance) {
 			self.updateFeedbacks()
 		}
 	} else {
-		self.log('debug', 'Unable to fetch medialists, application not launched')
+		logStatusChange(self, 'medialists', 'Unable to fetch medialists, application not launched')
 		const emptyAllMedia = [{ id: 'None', label: 'None' }]
 		if (JSON.stringify(self.CHOICES_MEDIALISTS_MEDIA) !== JSON.stringify(emptyAllMedia)) {
 			self.CHOICES_MEDIALISTS_MEDIA = emptyAllMedia
@@ -476,6 +519,7 @@ async function pollMedialist(self: MulticamInstance) {
 
 	const selectedMedialist = await fetchData(self, '/api/v3/medialist/selected')
 	if (selectedMedialist && selectedMedialist !== 'Application not launched!') {
+		clearStatus(self, 'medialistSelected')
 		self.MEDIALIST_SELECTED = selectedMedialist
 		let nextSelectedMedia: { id: string; label: string }[]
 		if (selectedMedialist.Items && selectedMedialist.Items.length > 0) {
@@ -498,7 +542,7 @@ async function pollMedialist(self: MulticamInstance) {
 		await updateVariable(self, 'medialistSelectedName', selectedMedialist.Name || '')
 		await updateVariable(self, 'medialistSelectedId', selectedMedialist.Id || '')
 	} else {
-		self.log('debug', 'Unable to fetch selected medialist, application not launched')
+		logStatusChange(self, 'medialistSelected', 'Unable to fetch selected medialist, application not launched')
 	}
 
 	//get selected media in selected medialist
@@ -506,10 +550,11 @@ async function pollMedialist(self: MulticamInstance) {
 
 	const selectedMedia = await fetchData(self, '/api/v3/medialist/selected/media')
 	if (selectedMedia && selectedMedia !== 'Application not launched!') {
+		clearStatus(self, 'medialistSelectedMedia')
 		self.MEDIALIST_SELECTED_MEDIA = selectedMedia
 		await updateVariable(self, 'medialistSelectedMedia', JSON.stringify(selectedMedia))
 	} else {
-		self.log('debug', 'Unable to fetch selected media, application not launched')
+		logStatusChange(self, 'medialistSelectedMedia', 'Unable to fetch selected media, application not launched')
 	}
 }
 
@@ -526,11 +571,12 @@ async function pollRecording(_self: MulticamInstance) {
 }
 
 async function pollScenes(self: MulticamInstance) {
-	self.log('debug', 'Polling scenes')
+	logVerbose(self, 'Polling scenes')
 
 	//get scenes files
 	const sceneFiles = await fetchData(self, '/api/v2/scenes/files')
 	if (sceneFiles && sceneFiles !== 'Application not launched!') {
+		clearStatus(self, 'sceneFiles')
 		self.SCENE_FILES = sceneFiles
 
 		//build CHOICES_SCENE_FILES
@@ -549,17 +595,18 @@ async function pollScenes(self: MulticamInstance) {
 			self.updateFeedbacks()
 		}
 	} else {
-		self.log('debug', 'Unable to fetch scene files, application not launched')
+		logStatusChange(self, 'sceneFiles', 'Unable to fetch scene files, application not launched')
 	}
 
 	//get selected secenes file
 	const selectedSceneFile = await fetchData(self, '/api/v2/scenes/selected')
 	if (selectedSceneFile && selectedSceneFile !== 'Application not launched!') {
+		clearStatus(self, 'sceneSelectedFile')
 		self.SCENES_FILE_SELECTED = selectedSceneFile
 		await updateVariable(self, 'sceneSelectedFileName', selectedSceneFile.Name || '')
 		await updateVariable(self, 'sceneSelectedFileId', selectedSceneFile.Id || '')
 	} else {
-		self.log('debug', 'Unable to fetch selected scene file, application not launched')
+		logStatusChange(self, 'sceneSelectedFile', 'Unable to fetch selected scene file, application not launched')
 	}
 
 	//get selected scenes file content
@@ -569,10 +616,15 @@ async function pollScenes(self: MulticamInstance) {
 			self.SCENES_FILE_SELECTED_SCENES = []
 			self.SCENES_FILE_SELECTED_SCENES = [{ Id: 'None', Name: 'None' }]
 			//log the error - .detail
-			self.log('debug', `Scenes file content error: ${selectedSceneFileContent.detail || 'Unknown error'}`)
+			logStatusChange(
+				self,
+				'sceneFileContent',
+				`Scenes file content error: ${selectedSceneFileContent.detail || 'Unknown error'}`,
+			)
 			return
 		}
 
+		clearStatus(self, 'sceneFileContent')
 		self.SCENES_FILE_SELECTED_SCENES = selectedSceneFileContent
 
 		//build CHOICES_SCENES_FILE_SELECTED_SCENES
@@ -591,35 +643,38 @@ async function pollScenes(self: MulticamInstance) {
 			self.updateFeedbacks()
 		}
 	} else {
-		self.log('debug', 'Unable to fetch selected scene file content, application not launched')
+		logStatusChange(self, 'sceneFileContent', 'Unable to fetch selected scene file content, application not launched')
 	}
 
 	//get selected scene
 	const selectedScene = await fetchData(self, '/api/v2/scenes/selected/livescene')
 	if (selectedScene && selectedScene !== 'Application not launched!') {
+		clearStatus(self, 'sceneSelected')
 		self.SCENES_FILE_SELECTED_SCENE = selectedScene
 		self.SCENES_FILE_SELECTED_SCENE_ID = selectedScene.Id || ''
 		await updateVariable(self, 'sceneSelectedSceneName', selectedScene.Name || '')
 		await updateVariable(self, 'sceneSelectedSceneId', selectedScene.Id || '')
 	} else {
-		self.log('debug', 'Unable to fetch selected scene, application not launched')
+		logStatusChange(self, 'sceneSelected', 'Unable to fetch selected scene, application not launched')
 	}
 }
 
 async function pollStreaming(self: MulticamInstance) {
-	self.log('debug', 'Polling streaming')
+	logVerbose(self, 'Polling streaming')
 	const streamingCatalogs = await fetchData(self, '/api/v2/streaming/catalogs')
-	if (streamingCatalogs) {
-		if (JSON.stringify(self.CHOICES_STREAMING_CATALOGS) !== JSON.stringify(streamingCatalogs)) {
-			self.CHOICES_STREAMING_CATALOGS = streamingCatalogs.map((c: any) => ({ id: c.Id, label: c.Name }))
+	if (Array.isArray(streamingCatalogs)) {
+		const choices = streamingCatalogs.map((c: any) => ({ id: c.Id, label: c.Name }))
+		if (JSON.stringify(self.CHOICES_STREAMING_CATALOGS) !== JSON.stringify(choices)) {
+			self.CHOICES_STREAMING_CATALOGS = choices
 			self.updateActions()
 		}
 	}
 
 	const streamingProfiles = await fetchData(self, '/api/v2/streaming/selected/profiles')
-	if (streamingProfiles) {
-		if (JSON.stringify(self.CHOICES_STREAMING_PROFILES) !== JSON.stringify(streamingProfiles)) {
-			self.CHOICES_STREAMING_PROFILES = streamingProfiles.map((p: any) => ({ id: p.Id, label: p.Name }))
+	if (Array.isArray(streamingProfiles)) {
+		const choices = streamingProfiles.map((p: any) => ({ id: p.Id, label: p.Name }))
+		if (JSON.stringify(self.CHOICES_STREAMING_PROFILES) !== JSON.stringify(choices)) {
+			self.CHOICES_STREAMING_PROFILES = choices
 			self.updateActions()
 		}
 	}
@@ -630,6 +685,8 @@ async function pollStudio(_self: MulticamInstance) {
 }
 
 async function pollTitler(self: MulticamInstance) {
+	logVerbose(self, 'Polling Titler')
+
 	//get titler files
 	const titlerFiles = await fetchData(self, '/api/v2/titler/files')
 	if (titlerFiles) {
@@ -657,21 +714,26 @@ async function pollTitler(self: MulticamInstance) {
 		//update name and id
 		await updateVariable(self, 'titlerSelectedFileName', selectedTitlerFile.Name || '')
 		await updateVariable(self, 'titlerSelectedFileId', selectedTitlerFile.Id || '')
-		self.log('debug', `Selected titler file ID: ${selectedTitlerFile.Id}`)
-		self.log('debug', `Selected titler file Name: ${selectedTitlerFile.Name}`)
+		logStatusChange(
+			self,
+			'titlerSelectedFile',
+			`Selected titler file: ${selectedTitlerFile.Name} (${selectedTitlerFile.Id})`,
+		)
 	} else {
 		await updateVariable(self, 'titlerSelectedFileName', 'None')
 		await updateVariable(self, 'titlerSelectedFileId', 'None')
-		self.log('debug', 'Unable to fetch selected titler file, application not launched')
+		logStatusChange(self, 'titlerSelectedFile', 'Unable to fetch selected titler file, application not launched')
 	}
 
 	//get selected titler file elements
 	const selectedTitlerFileElements = await fetchData(self, '/api/v2/titler/selected/elements')
 	if (selectedTitlerFileElements && selectedTitlerFileElements !== 'Application not launched!') {
 		if (selectedTitlerFileElements.status && selectedTitlerFileElements.status === 404) {
-			self.log('debug', 'No elements found for selected titler file')
+			logStatusChange(self, 'titlerElements', 'No elements found for selected titler file')
 			return
 		}
+
+		clearStatus(self, 'titlerElements')
 
 		let needsUpdate = false
 
@@ -688,16 +750,10 @@ async function pollTitler(self: MulticamInstance) {
 
 		//loop through elements and grab each element's content via /api/v2/titler/selected/elements/{elementId}/speaker/entries
 		for (const element of selectedTitlerFileElements) {
-			if (self.config.verbose) {
-				self.log('debug', `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
-			}
-
-			self.log('debug', `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
+			logVerbose(self, `Processing element ${element.Id} (${element.Name}) of type ${element.ElementType}`)
 
 			if (element.ElementType == 'Speaker') {
-				if (self.config.verbose) {
-					self.log('debug', `Fetching speaker entries for element ${element.Id} (${element.Name})`)
-				}
+				logVerbose(self, `Fetching speaker entries for element ${element.Id} (${element.Name})`)
 
 				// Build CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS
 				const tempSpeakerChoicesRows: any[] = []
@@ -710,11 +766,14 @@ async function pollTitler(self: MulticamInstance) {
 					if (elementSpeakerEntries.status && elementSpeakerEntries.status === 404) {
 						element.SpeakerEntries = []
 						//log the error - .detail
-						self.log(
-							'debug',
+						logStatusChange(
+							self,
+							`titlerSpeakerEntries:${element.Id}`,
 							`Titler element speaker entries error for element ${element.Id}: ${elementSpeakerEntries.detail || 'Unknown error'}`,
 						)
 					} else {
+						clearStatus(self, `titlerSpeakerEntries:${element.Id}`)
+
 						//append the speaker entries to the element object
 						element.SpeakerEntries = elementSpeakerEntries
 
@@ -758,9 +817,7 @@ async function pollTitler(self: MulticamInstance) {
 					element.LiveSpeakerRowId = elementLiveSpeakerRowId.Id || ''
 				}
 			} else if (element.ElementType == 'Panel') {
-				if (self.config.verbose) {
-					self.log('debug', `Fetching panel entries for element ${element.Id} (${element.Name})`)
-				}
+				logVerbose(self, `Fetching panel entries for element ${element.Id} (${element.Name})`)
 
 				//build CHOICES_TITLER_ELEMENTS_PANEL_ROWS
 				const tempPanelChoicesRows: any[] = []
@@ -774,11 +831,14 @@ async function pollTitler(self: MulticamInstance) {
 					if (elementPanelEntries.status && elementPanelEntries.status === 404) {
 						element.PanelEntries = []
 						//log the error - .detail
-						self.log(
-							'debug',
+						logStatusChange(
+							self,
+							`titlerPanelEntries:${element.Id}`,
 							`Titler element panel entries error for element ${element.Id}: ${elementPanelEntries.detail || 'Unknown error'}`,
 						)
 					} else {
+						clearStatus(self, `titlerPanelEntries:${element.Id}`)
+
 						//append the panel entries to the element object
 						element.PanelEntries = elementPanelEntries
 
@@ -833,7 +893,7 @@ async function pollTitler(self: MulticamInstance) {
 
 		self.checkFeedbacks()
 	} else {
-		self.log('debug', 'Unable to fetch selected titler file elements, application not launched')
+		logStatusChange(self, 'titlerElements', 'Unable to fetch selected titler file elements, application not launched')
 	}
 }
 
@@ -902,7 +962,7 @@ async function fetchData(self: MulticamInstance, endpoint: string, method?: stri
 		}
 	} catch (error: any) {
 		const message = String(error?.message ?? error)
-		const dedupe = getFetchErrorDedupeState(self)
+		const dedupe = getPollLogState(self)
 		if (dedupe.suppressDuplicateMessage !== message) {
 			self.log('error', `Failed to fetch data: ${message}`)
 			dedupe.suppressDuplicateMessage = message
