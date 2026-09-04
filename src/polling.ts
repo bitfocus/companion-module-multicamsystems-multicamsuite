@@ -50,20 +50,19 @@ export function startPolling(self: MulticamInstance): void {
 	stopPolling(self)
 	//poll once
 	void runPollCycle(self)
-	let interval = 30000
 	if (!self.config.enablePolling) {
 		self.log('info', 'Polling is disabled in config, use "Manually Refresh Data" action to update data')
-	} else {
-		interval = Number(self.config.pollingInterval || 5000)
-		if (!interval || isNaN(interval)) {
-			self.log('error', 'Invalid polling interval in config')
-			return
-		}
-		self.pollInterval = setInterval(() => {
-			void runPollCycle(self)
-		}, interval)
-		self.log('info', `Started polling every ${interval}ms`)
+		return
 	}
+	const interval = Number(self.config.pollingInterval || 5000)
+	if (!interval || isNaN(interval)) {
+		self.log('error', 'Invalid polling interval in config')
+		return
+	}
+	self.pollInterval = setInterval(() => {
+		void runPollCycle(self)
+	}, interval)
+	self.log('info', `Started polling every ${interval}ms`)
 }
 export function stopPolling(self?: MulticamInstance): void {
 	if (self?.pollInterval) {

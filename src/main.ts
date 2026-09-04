@@ -367,7 +367,7 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 		if (!this.isCurrentConnectionAttempt(attempt) || this.healthCheckInFlightForAttempt === attempt) return
 
 		this.healthCheckInFlightForAttempt = attempt
-		let connected = false
+		let connected: boolean
 		try {
 			connected = await ProbeConnection(this)
 		} finally {
