@@ -1,9 +1,36 @@
 import { InstanceStatus } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 import { startPolling, stopPolling } from './polling.js'
-import { InitSignalR } from './signalr.js'
+import { initSignalR, stopSignalR } from './signalr.js'
 
-export async function InitConnection(self: MulticamInstance): Promise<void> {
+const RECONNECT_INTERVAL_MS = 10000
+
+export function clearReconnectTimer(self: MulticamInstance): void {
+	if (self.reconnectTimer) {
+		clearTimeout(self.reconnectTimer)
+		self.reconnectTimer = null
+	}
+}
+
+export function scheduleReconnect(self: MulticamInstance, reason: string): void {
+	if (self.reconnectTimer) {
+		return
+	}
+	self.log('info', `${reason}; retrying in ${RECONNECT_INTERVAL_MS / 1000}s`)
+	self.reconnectTimer = setTimeout(() => {
+		self.reconnectTimer = null
+		void initConnection(self)
+	}, RECONNECT_INTERVAL_MS)
+}
+
+export async function stopConnection(self: MulticamInstance): Promise<void> {
+	clearReconnectTimer(self)
+	stopPolling(self)
+	await stopSignalR(self)
+}
+
+export async function initConnection(self: MulticamInstance): Promise<void> {
+	clearReconnectTimer(self)
 	self.updateStatus(InstanceStatus.Connecting, 'Connecting...')
 
 	if (self.config.host && self.config.port) {
@@ -17,21 +44,27 @@ export async function InitConnection(self: MulticamInstance): Promise<void> {
 
 			if (!results) {
 				self.updateStatus(InstanceStatus.ConnectionFailure, 'No response from Multicam')
-				stopPolling()
+				stopPolling(self)
+				await stopSignalR(self)
+				scheduleReconnect(self, 'No response from Multicam')
 				return
 			}
 
 			self.updateStatus(InstanceStatus.Ok)
 			self.log('info', 'Connected successfully')
 			startPolling(self)
-			InitSignalR(self)
+			initSignalR(self)
 		} catch (error: any) {
 			self.log('error', `Connection failed: ${error.message || error}`)
 			self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - check IP')
-			stopPolling()
+			stopPolling(self)
+			await stopSignalR(self)
+			scheduleReconnect(self, 'Connection failed')
 		}
 	} else {
 		self.updateStatus(InstanceStatus.BadConfig, 'Missing host or port')
+		stopPolling(self)
+		await stopSignalR(self)
 	}
 }
 

@@ -13,8 +13,8 @@
 			"email": "joseph@josephadams.dev"
 		},
 		{
-			"name": "Bryce Seifert",
-			"email": "bryce@bitfocus.io"
+			"name": "Bitfocus AS",
+			"email": "connections@bitfocus.io"
 		}
 	],
 	"legacyIds": [],
@@ -26,5 +26,5 @@
 	},
 	"manufacturer": "Multicam Systems",
 	"products": ["Multicam Suite"],
-	"keywords": ["Vision Mixer", "ptz", "Video"]
+	"keywords": ["vision mixer", "ptz", "Video"]
 }
