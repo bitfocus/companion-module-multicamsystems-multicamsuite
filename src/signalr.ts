@@ -111,6 +111,13 @@ export function cancelSignalRReconnect(instance: MulticamInstance): void {
 	signalRReconnectStates.delete(instance)
 }
 
+export function cancelSignalRRefreshes(instance: MulticamInstance): void {
+	const timer = refreshTimers.get(instance)
+	if (timer) clearTimeout(timer)
+	refreshTimers.delete(instance)
+	pendingRefreshes.delete(instance)
+}
+
 function scheduleSignalRReconnect(instance: MulticamInstance, connection: signalR.HubConnection): void {
 	if (instance._signalR !== connection || connection.state !== signalR.HubConnectionState.Disconnected) return
 

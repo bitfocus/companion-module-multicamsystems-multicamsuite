@@ -7,8 +7,8 @@ import { UpdatePresets } from './presets.js'
 import { UpdateVariableDefinitions, type VariablesSchema } from './variables.js'
 import { InitConnection, ProbeConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
-import { stopPolling } from './polling.js'
-import { cancelSignalRReconnect } from './signalr.js'
+import { resetPolling } from './polling.js'
+import { cancelSignalRReconnect, cancelSignalRRefreshes } from './signalr.js'
 
 const CONNECTION_HEALTH_CHECK_INTERVAL_MS = 5000
 const CONNECTION_HEALTH_FAILURE_THRESHOLD = 2
@@ -250,8 +250,9 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 		this.isDestroyed = true
 		this.connectionAttempt++
 		this.clearConnectionTimers()
-		stopPolling(this)
+		resetPolling(this)
 		cancelSignalRReconnect(this)
+		cancelSignalRRefreshes(this)
 		if (this._signalR) {
 			const connection = this._signalR
 			this._signalR = null
@@ -260,6 +261,8 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	async configUpdated(config: ModuleConfig, secrets: ModuleSecrets): Promise<void> {
+		resetPolling(this)
+		cancelSignalRRefreshes(this)
 		this.config = config
 		this.secrets = secrets ?? { apiKey: '' }
 		this.startConnection()
@@ -291,7 +294,8 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 		const attempt = ++this.connectionAttempt
 		this.clearConnectionTimers()
 		this.connectionRetryCount = 0
-		stopPolling(this)
+		resetPolling(this)
+		cancelSignalRRefreshes(this)
 		this.launchConnectionAttempt(attempt)
 	}
 
@@ -388,7 +392,7 @@ export class MulticamInstance extends InstanceBase<ModuleSchema> {
 			clearInterval(this.healthCheckTimer)
 			this.healthCheckTimer = null
 		}
-		stopPolling(this)
+		resetPolling(this)
 		this.connectionRetryCount = 0
 		this.launchConnectionAttempt(attempt)
 	}

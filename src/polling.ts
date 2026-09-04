@@ -31,6 +31,7 @@ type PollQueueState = {
 
 const pollQueueByInstance = new WeakMap<MulticamInstance, PollQueueState>()
 const fetchErrorDedupeByInstance = new WeakMap<MulticamInstance, FetchErrorDedupeState>()
+const fetchAbortControllerByInstance = new WeakMap<MulticamInstance, AbortController>()
 function getFetchErrorDedupeState(self: MulticamInstance) {
 	let s = fetchErrorDedupeByInstance.get(self)
 	if (!s) {
@@ -69,6 +70,15 @@ export function stopPolling(self?: MulticamInstance): void {
 		clearInterval(self.pollInterval)
 		self.pollInterval = null
 	}
+}
+
+/** Stop scheduled and in-flight polling and ensure the next request starts with a fresh queue. */
+export function resetPolling(self: MulticamInstance): void {
+	stopPolling(self)
+	fetchAbortControllerByInstance.get(self)?.abort()
+	fetchAbortControllerByInstance.delete(self)
+	pollQueueByInstance.delete(self)
+	fetchErrorDedupeByInstance.delete(self)
 }
 export async function runPollCycle(self: MulticamInstance, options: PollOptions = {}): Promise<void> {
 	return queuePollRequest(self, true, [], options)
@@ -855,6 +865,12 @@ export async function fetchData(
 ): Promise<any> {
 	try {
 		if (self.config.host && self.config.port) {
+			let abortController = fetchAbortControllerByInstance.get(self)
+			if (!abortController || abortController.signal.aborted) {
+				abortController = new AbortController()
+				fetchAbortControllerByInstance.set(self, abortController)
+			}
+			const requestController = abortController
 			const url = `http://${self.config.host}:${self.config.port}${endpoint}`
 			if (self.config.verbose) {
 				self.log('debug', `Fetching: ${url}`)
@@ -878,23 +894,40 @@ export async function fetchData(
 				method: method,
 				headers: headers,
 				body: body,
+				signal: requestController.signal,
 			})
 			const contentType = response.headers.get('content-type') || ''
 			const raw = await response.text()
-			if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
-				const parsed = JSON.parse(raw)
-				markFetchSucceeded(self)
-				return parsed
-			} else {
-				const trimmed = raw.trim()
-				markFetchSucceeded(self)
-				return trimmed
+			if (requestController.signal.aborted || fetchAbortControllerByInstance.get(self) !== requestController) {
+				return null
 			}
+
+			let result: any = raw.trim()
+			if (raw && (contentType.includes('application/json') || contentType.includes('application/problem+json'))) {
+				result = JSON.parse(raw)
+			}
+			if (!response.ok) {
+				const detail =
+					typeof result === 'string'
+						? result
+						: String(result?.detail ?? result?.title ?? response.statusText ?? 'Request failed')
+				const message = `${method} ${endpoint} failed (${response.status}): ${detail}`
+				const dedupe = getFetchErrorDedupeState(self)
+				if (dedupe.suppressDuplicateMessage !== message) {
+					self.log('warn', message)
+					dedupe.suppressDuplicateMessage = message
+				}
+				return null
+			}
+
+			markFetchSucceeded(self)
+			return result
 		} else {
 			self.log('error', 'Invalid host or port configuration')
 			return null
 		}
 	} catch (error: any) {
+		if (error?.name === 'AbortError') return null
 		const message = String(error?.message ?? error)
 		const dedupe = getFetchErrorDedupeState(self)
 		if (dedupe.suppressDuplicateMessage !== message) {
