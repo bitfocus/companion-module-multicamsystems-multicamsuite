@@ -1,11 +1,19 @@
-import { InstanceBase, runEntrypoint, type SomeCompanionConfigField } from '@companion-module/base'
-import { GetConfigFields, type ModuleConfig } from './config.js'
+import { InstanceBase, InstanceStatus, type SomeCompanionConfigField } from '@companion-module/base'
+import { GetConfigFields, type ModuleConfig, type ModuleSecrets } from './config.js'
 import { UpgradeScripts } from './upgrades.js'
-import { UpdateActions } from './actions.js'
-import { UpdateFeedbacks } from './feedbacks.js'
-import { UpdateVariableDefinitions } from './variables.js'
-import { initConnection, stopConnection } from './api.js'
+import { UpdateActions, type ActionsSchema } from './actions.js'
+import { UpdateFeedbacks, type FeedbacksSchema } from './feedbacks.js'
+import { UpdatePresets } from './presets.js'
+import { UpdateVariableDefinitions, type VariablesSchema } from './variables.js'
+import { InitConnection, ProbeConnection } from './api.js'
 import type * as signalR from '@microsoft/signalr'
+import { resetPolling } from './polling.js'
+import { cancelSignalRReconnect, cancelSignalRRefreshes } from './signalr.js'
+
+const CONNECTION_HEALTH_CHECK_INTERVAL_MS = 5000
+const CONNECTION_HEALTH_FAILURE_THRESHOLD = 2
+const CONNECTION_RETRY_BASE_MS = 2000
+const CONNECTION_RETRY_MAX_MS = 30000
 
 export interface StreamingProfile {
 	id: string
@@ -18,16 +26,60 @@ export interface StreamingProfile {
 	errorMessage: string
 }
 
-export class MulticamInstance extends InstanceBase<ModuleConfig> {
+export interface DropdownChoice {
+	id: string
+	label: string
+}
+
+export type ModuleSchema = {
+	config: ModuleConfig
+	secrets: ModuleSecrets
+	actions: ActionsSchema
+	feedbacks: FeedbacksSchema
+	variables: VariablesSchema
+}
+
+export { UpgradeScripts }
+
+export class MulticamInstance extends InstanceBase<ModuleSchema> {
 	config!: ModuleConfig // Setup in init()
-	CHOICES_APPLICATIONS: { id: string; label: string }[]
+	secrets: ModuleSecrets = { apiKey: '' }
+	CHOICES_APPLICATIONS: DropdownChoice[]
 	APPLICATIONS: any[] = [] //list of licensed applications
+	APPLICATION_TEMPLATES: Record<string, any[]> = {}
+	CHOICES_APPLICATION_TEMPLATES: DropdownChoice[] = []
+	RUNNING_APPLICATION: string = ''
 	ROOMS: any[] = [] //list of rooms
-	CHOICES_ROOMS: { id: string; label: string }[] = [] //choices for rooms
+	CHOICES_ROOMS: DropdownChoice[] = [] //choices for rooms
 	ROOM_SELECTED: any = {} //currently selected room
 	AUDIO_PROFILES: any[] = [] //list of audio profiles
 	AUDIO_PROFILE_SELECTED: any = {} //currently selected audio profile
-	CHOICES_AUDIO_PROFILES: { id: string; label: string }[] = [] //choices for audio profiles
+	CHOICES_AUDIO_PROFILES: DropdownChoice[] = [] //choices for audio profiles
+
+	//CAMERA / PILOT / STUDIO
+	CHOICES_CAMERA_SOURCES: DropdownChoice[] = []
+	CHOICES_CAMERA_INDEXES: DropdownChoice[] = []
+	PILOT_SEQUENCES: any[] = []
+	CHOICES_PILOT_SEQUENCES: DropdownChoice[] = []
+	STUDIO_PRESETS: any[] = []
+	CHOICES_STUDIO_PRESETS: DropdownChoice[] = []
+
+	//CONF
+	CONF_MICROPHONES: any[] = []
+	CHOICES_CONF_MICROPHONES: DropdownChoice[] = []
+	CONF_PRESET_BANKS: any[] = []
+	CHOICES_CONF_PRESET_BANKS: DropdownChoice[] = []
+	CONF_STATE: any = {}
+
+	//INSITU
+	INSITU_TAGS: any[] = []
+	INSITU_ACTIVE_TAGS: any[] = []
+	CHOICES_INSITU_TAGS: DropdownChoice[] = []
+	INSITU_LAYOUTS: any[] = []
+	INSITU_ACTIVE_LAYOUT: any = {}
+	CHOICES_INSITU_LAYOUTS: DropdownChoice[] = []
+	INSITU_PRESETS: any[] = []
+	CHOICES_INSITU_PRESETS: DropdownChoice[] = []
 
 	COMPOSER_FILES: any[] = [] //list of composer files
 	COMPOSER_FILE_SELECTED: any = {} //currently selected composer file
@@ -35,123 +87,137 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 	COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION: any = {} //currently selected composition in selected composer
 	COMPOSER_FILE_SELECTED_COMPOSITIONS_SELECTED_COMPOSITION_ID: string = '' //id of currently selected composition in selected composer
 
-	CHOICES_COMPOSER_FILES: { id: string; label: string }[] = [] //choices for composer files
-	CHOICES_COMPOSER_COMPOSITIONS: { id: string; label: string }[] = [] //choices for compositions in selected composer file
-	CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS: { id: string; label: string }[] = [] //choices for elements in selected composition
+	CHOICES_COMPOSER_FILES: DropdownChoice[] = [] //choices for composer files
+	CHOICES_COMPOSER_COMPOSITIONS: DropdownChoice[] = [] //choices for compositions in selected composer file
+	CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS: DropdownChoice[] = [] //choices for elements in selected composition
 
-	CHOICES_VIDEO_SOURCES: { id: string; label: string }[] = []
+	CHOICES_VIDEO_SOURCES: DropdownChoice[] = []
+	CHOICES_RECORDING_AUX_SOURCES: DropdownChoice[] = []
 
-	CHOICES_MEDIALIST_SELECTED_MEDIA: { id: string; label: string }[] = [] //choices for media in selected medialist
+	CHOICES_MEDIALIST_SELECTED_MEDIA: DropdownChoice[] = [] //choices for media in selected medialist
 	/** All media in all medialists; id is `medialistId|mediaId`, label `Medialist Name - Media Name`. */
-	CHOICES_MEDIALISTS_MEDIA: { id: string; label: string }[] = []
+	CHOICES_MEDIALISTS_MEDIA: DropdownChoice[] = []
 	MEDIALISTS: any[] = [] //list of medialists
-	CHOICES_MEDIALISTS: { id: string; label: string }[] = [] //choices for medialists
+	CHOICES_MEDIALISTS: DropdownChoice[] = [] //choices for medialists
 	MEDIALIST_SELECTED: any = {} //currently selected medialist
 	MEDIALIST_SELECTED_MEDIA: any[] = [] //media items in selected medialist
-	CHOICES_RADIO_PRESET_BANKS: { id: string; label: string }[] = [] //choices for radio preset banks
+	CHOICES_RADIO_PRESET_BANKS: DropdownChoice[] = [] //choices for radio preset banks
 	RADIO_PRESET_BANKS: any[] = [] //list of radio preset banks
+	RADIO_MICROPHONES: any[] = []
+	CHOICES_RADIO_MICROPHONES: DropdownChoice[] = []
+	RADIO_STATE: any = {}
+	RADIO_AUTOMATION_VARIABLES: any[] = []
+
+	//PUBLISHER
+	PUBLISHER_RECORDINGS: any[] = []
+	CHOICES_PUBLISHER_RECORDINGS: DropdownChoice[] = []
+	PUBLISHER_WORKFLOWS: any[] = []
+	CHOICES_PUBLISHER_WORKFLOWS: DropdownChoice[] = []
+	SIGNALR_PUBLISHING_JOBS: any[] = []
+	SIGNALR_CROP_ZONES: any[] = []
+	CHOICES_SIGNALR_CROP_ZONES: DropdownChoice[] = []
+	SIGNALR_NETWORK_SHARE: any = null
+	SIGNALR_PAGED_RECORDINGS: any = null
+	SIGNALR_SELECTED_MICROPHONE: number = -1
+	SIGNALR_ZOOM_ENABLED: boolean = false
+	SIGNALR_CONNECTED: boolean = false
+	SIGNALR_LAST_EVENT: string = ''
+	SIGNALR_LAST_PAYLOAD: string = ''
 
 	//SCENES
 	SCENE_FILES: any[] = [] //list of scene files
 	SCENES_FILE_SELECTED: any = {} //currently selected scene file
-	CHOICES_SCENES_FILES: { id: string; label: string }[] = [] //choices for scene files
+	CHOICES_SCENES_FILES: DropdownChoice[] = [] //choices for scene files
 	SCENES_FILE_SELECTED_SCENES: any[] = [] //scenes in currently selected scene file
-	CHOICES_SCENES_FILE_SELECTED_SCENES: { id: string; label: string }[] = [] //choices for scenes in selected scene file
+	CHOICES_SCENES_FILE_SELECTED_SCENES: DropdownChoice[] = [] //choices for scenes in selected scene file
 	SCENES_FILE_SELECTED_SCENE: any = {} //currently selected scene in selected scene file
 	SCENES_FILE_SELECTED_SCENE_ID: string = '' //id of currently selected scene in selected scene file
 
-	CHOICES_STREAMING_CATALOGS: { id: string; label: string }[] = [] //choices for streaming catalogs
-	CHOICES_STREAMING_PROFILES: { id: string; label: string }[] = [] //choices for streaming profiles
+	STREAMING_CATALOG_SELECTED: any = {}
+	STREAMING_PROFILES: any[] = []
+	CHOICES_STREAMING_CATALOGS: DropdownChoice[] = [] //choices for streaming catalogs
+	CHOICES_STREAMING_PROFILES: DropdownChoice[] = [] //choices for streaming profiles
 
 	//TITLER
 	TITLER_FILES: any[] = [] //list of titler files
-	CHOICES_TITLER_FILES: { id: string; label: string }[] = [] //choices for titler files
+	TITLER_FILE_SELECTED: any = {} //currently selected titler file
+	CHOICES_TITLER_FILES: DropdownChoice[] = [] //choices for titler files
 	TITLER_SELECTED_FILE_ELEMENTS: any[] = [] //elements in currently selected titler file
-	CHOICES_TITLER_ELEMENTS: { id: string; label: string }[] = [] //choices for titler elements
-	CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS: { id: string; label: string }[] = [] //choices for titler elements speaker rows
-	CHOICES_TITLER_ELEMENTS_PANEL_ROWS: { id: string; label: string }[] = [] //choices for titler elements panel rows
+	CHOICES_TITLER_ELEMENTS: DropdownChoice[] = [] //choices for titler elements
+	CHOICES_TITLER_SPEAKER_ELEMENTS: DropdownChoice[] = []
+	CHOICES_TITLER_PANEL_ELEMENTS: DropdownChoice[] = []
+	CHOICES_TITLER_TICKER_ELEMENTS: DropdownChoice[] = []
+	CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS: DropdownChoice[] = [] //choices for titler elements speaker rows
+	CHOICES_TITLER_ELEMENTS_PANEL_ROWS: DropdownChoice[] = [] //choices for titler elements panel rows
+	TITLER_ELEMENT_STRUCTURES: Record<string, any> = {}
 
 	//STATUS
 	RECORDING: boolean = false //recording is currently active
+	RECORDING_PAUSED: boolean = false
+	RECORDING_LIVE_EXTRACT: any = {}
 	ACTIVE_STREAMS: StreamingProfile[] = [] //profiles in the selected streaming catalog
+	VIDEO_LIVE_SOURCE: string = ''
+	VIDEO_MIXER: any = {}
+	MEDIA_CONSTRAINTS: any = {}
 
 	pollInterval: NodeJS.Timeout | null = null
-	reconnectTimer: NodeJS.Timeout | null = null
 	_signalR: signalR.HubConnection | null = null
+	private connectionAttempt = 0
+	private isDestroyed = false
+	private reconnectTimer: NodeJS.Timeout | null = null
+	private healthCheckTimer: NodeJS.Timeout | null = null
+	private healthCheckInFlightForAttempt: number | null = null
+	private healthCheckFailures = 0
+	private connectionRetryCount = 0
 
 	constructor(internal: unknown) {
 		super(internal)
 
 		this.CHOICES_APPLICATIONS = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_APPLICATION_TEMPLATES = [{ id: 'none', label: 'None' }]
 
 		this.CHOICES_AUDIO_PROFILES = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_CAMERA_SOURCES = Array.from({ length: 40 }, (_, index) => ({
+			id: `CAM${index + 1}`,
+			label: `CAM${index + 1}`,
+		}))
+		this.CHOICES_CAMERA_INDEXES = Array.from({ length: 40 }, (_, index) => ({
+			id: String(index),
+			label: `Camera ${index + 1} (index ${index})`,
+		}))
+		this.CHOICES_PILOT_SEQUENCES = [{ id: 'none', label: 'None' }]
+		this.CHOICES_STUDIO_PRESETS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_CONF_MICROPHONES = [{ id: 'none', label: 'None' }]
+		this.CHOICES_CONF_PRESET_BANKS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_INSITU_TAGS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_INSITU_LAYOUTS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_INSITU_PRESETS = [{ id: 'none', label: 'None' }]
 
 		this.CHOICES_COMPOSER_FILES = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_COMPOSER_COMPOSITIONS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_COMPOSER_COMPOSITIONS_ELEMENTS = [{ id: 'none', label: 'None' }] //default value
 
 		this.CHOICES_VIDEO_SOURCES = [
-			{ id: 'Unknown', label: 'Unknown' },
-			{ id: 'VGA', label: 'VGA' },
-			{ id: 'CAM1', label: 'CAM1' },
-			{ id: 'CAM2', label: 'CAM2' },
-			{ id: 'CAM3', label: 'CAM3' },
-			{ id: 'CAM4', label: 'CAM4' },
-			{ id: 'CAM5', label: 'CAM5' },
-			{ id: 'CAM6', label: 'CAM6' },
-			{ id: 'CAM7', label: 'CAM7' },
-			{ id: 'CAM8', label: 'CAM8' },
-			{ id: 'CAM9', label: 'CAM9' },
-			{ id: 'CAM10', label: 'CAM10' },
-			{ id: 'CAM11', label: 'CAM11' },
-			{ id: 'CAM12', label: 'CAM12' },
-			{ id: 'CAM13', label: 'CAM13' },
-			{ id: 'CAM14', label: 'CAM14' },
-			{ id: 'CAM15', label: 'CAM15' },
-			{ id: 'CAM16', label: 'CAM16' },
-			{ id: 'CAM17', label: 'CAM17' },
-			{ id: 'CAM18', label: 'CAM18' },
-			{ id: 'CAM19', label: 'CAM19' },
-			{ id: 'CAM20', label: 'CAM20' },
-			{ id: 'CAM21', label: 'CAM21' },
-			{ id: 'CAM22', label: 'CAM22' },
-			{ id: 'CAM23', label: 'CAM23' },
-			{ id: 'CAM24', label: 'CAM24' },
-			{ id: 'CAM25', label: 'CAM25' },
-			{ id: 'CAM26', label: 'CAM26' },
-			{ id: 'CAM27', label: 'CAM27' },
-			{ id: 'CAM28', label: 'CAM28' },
-			{ id: 'CAM29', label: 'CAM29' },
-			{ id: 'CAM30', label: 'CAM30' },
-			{ id: 'CAM31', label: 'CAM31' },
-			{ id: 'CAM32', label: 'CAM32' },
-			{ id: 'CAM33', label: 'CAM33' },
-			{ id: 'CAM34', label: 'CAM34' },
-			{ id: 'CAM35', label: 'CAM35' },
-			{ id: 'CAM36', label: 'CAM36' },
-			{ id: 'CAM37', label: 'CAM37' },
-			{ id: 'CAM38', label: 'CAM38' },
-			{ id: 'CAM39', label: 'CAM39' },
-			{ id: 'CAM40', label: 'CAM40' },
-			{ id: 'AUDIO1', label: 'AUDIO1' },
-			{ id: 'AUDIO2', label: 'AUDIO2' },
-			{ id: 'AUDIO3', label: 'AUDIO3' },
-			{ id: 'AUDIO4', label: 'AUDIO4' },
-			{ id: 'AUDIO5', label: 'AUDIO5' },
-			{ id: 'AUDIO6', label: 'AUDIO6' },
-			{ id: 'AUDIO7', label: 'AUDIO7' },
-			{ id: 'AUDIO8', label: 'AUDIO8' },
-			{ id: 'Playlist', label: 'Playlist' },
-			{ id: 'Output', label: 'Output' },
-			{ id: 'Composition', label: 'Composition' },
-			{ id: 'File', label: 'File' },
-			{ id: 'WebRTC', label: 'WebRTC' },
-		] //choices for video sources (cameras, screen captures, etc.)
+			...Array.from({ length: 40 }, (_, index) => ({
+				id: `Source ${index + 1}`,
+				label: `Source ${index + 1}`,
+			})),
+			{ id: 'PC Input', label: 'PC Input' },
+			{ id: 'Medialist', label: 'Medialist' },
+		]
+		this.CHOICES_RECORDING_AUX_SOURCES = Array.from({ length: 40 }, (_, index) => ({
+			id: `Source ${index + 1}`,
+			label: `Source ${index + 1}`,
+		}))
 
 		this.CHOICES_MEDIALIST_SELECTED_MEDIA = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_MEDIALISTS_MEDIA = [{ id: 'None', label: 'None' }]
 
 		this.CHOICES_RADIO_PRESET_BANKS = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_RADIO_MICROPHONES = [{ id: 'none', label: 'None' }]
+		this.CHOICES_PUBLISHER_RECORDINGS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_PUBLISHER_WORKFLOWS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_SIGNALR_CROP_ZONES = [{ id: 'none', label: 'None' }]
 
 		this.CHOICES_SCENES_FILES = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_SCENES_FILE_SELECTED_SCENES = [{ id: 'none', label: 'None' }] //default value
@@ -161,37 +227,45 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 
 		this.CHOICES_TITLER_FILES = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS = [{ id: 'none', label: 'None' }] //default value
+		this.CHOICES_TITLER_SPEAKER_ELEMENTS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_TITLER_PANEL_ELEMENTS = [{ id: 'none', label: 'None' }]
+		this.CHOICES_TITLER_TICKER_ELEMENTS = [{ id: 'none', label: 'None' }]
 		this.CHOICES_TITLER_ELEMENTS_SPEAKER_ROWS = [{ id: 'none', label: 'None' }] //default value
 		this.CHOICES_TITLER_ELEMENTS_PANEL_ROWS = [{ id: 'none', label: 'None' }] //default value
 	}
 
-	async init(config: ModuleConfig): Promise<void> {
+	async init(config: ModuleConfig, _isFirstInit: boolean, secrets: ModuleSecrets): Promise<void> {
 		this.config = config
-		this.updateActions() // export actions
+		this.secrets = secrets ?? { apiKey: '' }
+		this.isDestroyed = false
+		this.updateActions(false) // export actions; presets are exported after feedbacks
 		this.updateFeedbacks() // export feedbacks
+		this.updatePresets() // export presets
 		this.updateVariableDefinitions() // export variable definitions
-
-		try {
-			await this.initConnection()
-		} catch (error) {
-			this.log('error', `Failed to initialize connection: ${error}`)
-		}
+		this.startConnection()
 	}
 	// When module gets deleted
 	async destroy(): Promise<void> {
 		this.log('debug', 'destroy')
-		await stopConnection(this)
+		this.isDestroyed = true
+		this.connectionAttempt++
+		this.clearConnectionTimers()
+		resetPolling(this)
+		cancelSignalRReconnect(this)
+		cancelSignalRRefreshes(this)
+		if (this._signalR) {
+			const connection = this._signalR
+			this._signalR = null
+			await connection.stop()
+		}
 	}
 
-	async configUpdated(config: ModuleConfig): Promise<void> {
+	async configUpdated(config: ModuleConfig, secrets: ModuleSecrets): Promise<void> {
+		resetPolling(this)
+		cancelSignalRRefreshes(this)
 		this.config = config
-
-		try {
-			await stopConnection(this)
-			await this.initConnection()
-		} catch (error) {
-			this.log('error', `Failed to initialize connection: ${error}`)
-		}
+		this.secrets = secrets ?? { apiKey: '' }
+		this.startConnection()
 	}
 
 	// Return config fields for web config
@@ -199,21 +273,141 @@ export class MulticamInstance extends InstanceBase<ModuleConfig> {
 		return GetConfigFields()
 	}
 
-	updateActions(): void {
+	updateActions(updatePresets: boolean = true): void {
 		UpdateActions(this)
+		if (updatePresets) this.updatePresets()
 	}
 
 	updateFeedbacks(): void {
 		UpdateFeedbacks(this)
 	}
 
+	updatePresets(): void {
+		UpdatePresets(this)
+	}
+
 	updateVariableDefinitions(): void {
 		UpdateVariableDefinitions(this)
 	}
 
-	async initConnection(): Promise<void> {
-		await initConnection(this)
+	private startConnection(): void {
+		const attempt = ++this.connectionAttempt
+		this.clearConnectionTimers()
+		this.connectionRetryCount = 0
+		resetPolling(this)
+		cancelSignalRRefreshes(this)
+		this.launchConnectionAttempt(attempt)
+	}
+
+	private launchConnectionAttempt(attempt: number): void {
+		void this.initConnection(attempt).catch((error) => {
+			if (this.isCurrentConnectionAttempt(attempt)) {
+				this.log('error', `Failed to initialize connection: ${error}`)
+				this.scheduleConnectionRetry(attempt)
+			}
+		})
+	}
+
+	private async initConnection(attempt: number): Promise<void> {
+		const isCurrent = (): boolean => this.isCurrentConnectionAttempt(attempt)
+		if (!isCurrent()) return
+
+		cancelSignalRReconnect(this)
+		if (this._signalR) {
+			const connection = this._signalR
+			this._signalR = null
+			await connection.stop()
+			if (!isCurrent()) return
+		}
+
+		const connected = await InitConnection(this, isCurrent)
+		if (!isCurrent()) return
+
+		if (connected) {
+			this.connectionRetryCount = 0
+			this.startConnectionHealthCheck(attempt)
+		} else {
+			this.scheduleConnectionRetry(attempt)
+		}
+	}
+
+	private isCurrentConnectionAttempt(attempt: number): boolean {
+		return !this.isDestroyed && attempt === this.connectionAttempt
+	}
+
+	private scheduleConnectionRetry(attempt: number): void {
+		if (!this.isCurrentConnectionAttempt(attempt) || this.reconnectTimer || !this.config.host || !this.config.port) {
+			return
+		}
+
+		const delay = Math.min(
+			CONNECTION_RETRY_BASE_MS * 2 ** Math.min(this.connectionRetryCount, 4),
+			CONNECTION_RETRY_MAX_MS,
+		)
+		this.connectionRetryCount++
+		const delaySeconds = Math.ceil(delay / 1000)
+		this.updateStatus(InstanceStatus.ConnectionFailure, `Multicam unavailable - retrying in ${delaySeconds}s`)
+		this.log('warn', `Multicam unavailable; retrying /api/application/version in ${delaySeconds}s`)
+
+		this.reconnectTimer = setTimeout(() => {
+			this.reconnectTimer = null
+			if (this.isCurrentConnectionAttempt(attempt)) this.launchConnectionAttempt(attempt)
+		}, delay)
+	}
+
+	private startConnectionHealthCheck(attempt: number): void {
+		if (this.healthCheckTimer) clearInterval(this.healthCheckTimer)
+		this.healthCheckFailures = 0
+		this.healthCheckTimer = setInterval(() => {
+			void this.checkConnectionHealth(attempt)
+		}, CONNECTION_HEALTH_CHECK_INTERVAL_MS)
+	}
+
+	private async checkConnectionHealth(attempt: number): Promise<void> {
+		if (!this.isCurrentConnectionAttempt(attempt) || this.healthCheckInFlightForAttempt === attempt) return
+
+		this.healthCheckInFlightForAttempt = attempt
+		let connected: boolean
+		try {
+			connected = await ProbeConnection(this)
+		} finally {
+			if (this.healthCheckInFlightForAttempt === attempt) this.healthCheckInFlightForAttempt = null
+		}
+
+		if (!this.isCurrentConnectionAttempt(attempt)) return
+		if (connected) {
+			this.healthCheckFailures = 0
+			return
+		}
+
+		this.healthCheckFailures++
+		if (this.healthCheckFailures < CONNECTION_HEALTH_FAILURE_THRESHOLD) {
+			this.log('warn', 'Multicam health check failed once; waiting for confirmation')
+			return
+		}
+
+		this.log('warn', 'Connection to Multicam lost; starting automatic reconnection')
+		this.updateStatus(InstanceStatus.ConnectionFailure, 'Connection lost - reconnecting...')
+		if (this.healthCheckTimer) {
+			clearInterval(this.healthCheckTimer)
+			this.healthCheckTimer = null
+		}
+		resetPolling(this)
+		this.connectionRetryCount = 0
+		this.launchConnectionAttempt(attempt)
+	}
+
+	private clearConnectionTimers(): void {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer)
+			this.reconnectTimer = null
+		}
+		if (this.healthCheckTimer) {
+			clearInterval(this.healthCheckTimer)
+			this.healthCheckTimer = null
+		}
+		this.healthCheckFailures = 0
 	}
 }
 
-runEntrypoint(MulticamInstance, UpgradeScripts)
+export default MulticamInstance

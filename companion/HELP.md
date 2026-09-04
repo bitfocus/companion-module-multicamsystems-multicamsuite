@@ -16,93 +16,136 @@ This module will communicate with Multicam Systems' Multicam Suite software.
 
 ## Actions
 
+Deprecated API groups are intentionally excluded.
+
 ### Application
 
-- Application - Start
-- Application - Start with Room
-- Application - Set Auto Mode
-- Application - Toggle Auto/Manual Mode
-- Application - Manually Refresh Data
+- Start, start with template, and start with room
+- Retry a failed start
+- Set or toggle Auto/Manual mode
+- Manually refresh all API data
+
+### Audio
+
+- Select an audio mixer profile discovered from the API
+
+### Camera
+
+- Reset one or all cameras
+- Toggle, enable, or disable automatic framing
 
 ### Composer
 
-- Composer - Select File
-- Composer - Select Composition
-- Composer - Change Element Source
+- Select a Composer file or composition, or untake the current composition
+- Change a composition element source
+
+### Conf
+
+- Set a manual microphone, wide shot, or automatic microphone mode
+- Set AI dynamism and Auto Frame Flow
+- Select a preset bank
+- Enable, disable, or reset automatic titling
+
+### Insitu
+
+- Activate or deactivate tags
+- Activate layouts
+- Recall PTZ presets
+- Start or stop a live extract
 
 ### Medialist
 
-- Medialist - Create
-- Medialist - Select
-- Medialist - Add Media
-- Medialist - Play
-- Medialist - Stop
-- Medialist - Pause
-- Medialist - Move to Index (Selected)
+- Create and select Medialists
+- Add media by path or by full media-description JSON
+- Play, stop, and pause the selected or a specified Medialist
+- Select, play, update, or delete media by API-provided ID
+- Set audio mode and after-play behavior
+- Move media up, down, to an index, or between indexes
+- Clear a Medialist
+
+### Pilot
+
+- Prepare, play, or stop an active-bank sequence
+- Stop the running sequence for a camera
 
 ### Publisher
 
-- Publisher - Publish Recording
+- Publish a recording with a fully automated workflow
+- Rename or delete a recording
+- Remove unavailable recording entries
+
+### Radio
+
+- Set a manual microphone, wide shot, or automatic microphone mode
+- Set AI dynamism and Auto Frame Flow overrides
+- Select a preset bank
+- Enable, disable, or reset automatic titling
+- Enable/disable automation and override the current program
+- Merge, replace, or clear automation variables using JSON
 
 ### Recording
 
-- Recording - Start
-- Recording - Start (Duration)
-- Recording - Pause/Resume
-- Recording - Stop
-- Recording - Start All ISO Recordings
-- Recording - Stop All ISO Recordings
-- Recording - Start ISO Recording
-- Recording - Stop ISO Recording
+- Start, timed start, Tracking start, pause/resume, and stop
+- Set recording split duration
+- Start or stop a live extract
+- Start or stop all ISO recordings or a recording on one source
 
 ### Scenes
 
-- Scenes - Select Scene File
-- Scenes - Take Scene
+- Select a Scene file and take a Scene
 
 ### Streaming
 
-- Streaming – Select Catalog
-- Streaming – Start Profile
-- Streaming – Stop Profile
-- Streaming – Start All Profiles in Selected Catalog
-- Streaming – Stop All Profiles in Selected Catalog
+- Select a catalog
+- Start or stop one profile or all profiles
+- Update a profile; the module gets and merges its current model before sending the PUT request
 
-### System
+### Studio
 
-- System - Shutdown
+- Recall a PTZ preset, optionally allowing recall on a live camera
+- Recall a preset and set the camera live
+- Store a preset and run auto framing
 
 ### Titler
 
-- Titler - Set Titler File
-- Titler - Take Element Live
-- Titler - Set Speaker Row Live
-- Titler - Set Panel Row Live
-- Titler - Clear Speaker Live Row
-- Titler - Clear Panel Live Row
-- Titler - Update Speaker Row
-- Titler - Update Panel Row
-- Titler - Delete Speaker Row
-- Titler - Delete Panel Row
-- Titler - Clear Speaker Entry (Live)
-- Titler - Clear Panel Entry (Live)
-- Titler - Add Speaker Entry
-- Titler - Update All Speaker Entries
-- Titler - Add Panel Entry
-- Titler - Update All Panel Entries
-- Titler - Set Ticker Content
+- Select a Titler file and take an element on or off
+- Set or clear live Speaker/Panel rows
+- Add, update, delete, or replace all Speaker/Panel rows
+- Set social-media data and Ticker content
+- Row updates get the current row before merging and sending a complete PUT model
 
 ### Video
 
-- Video - Change Live Source
-- Video - Restart Output
+- Change the live source using the fixed `Source 1`–`Source 40`, `PC Input`, or `Medialist` choices
+- Restart the output
+
+## SignalR state synchronization
+
+- Connect automatically to `/signalr`, including API-key authentication and automatic reconnection
+- Receive real-time events, read current hub state, and refresh dependent API data when needed
+- SignalR is used only for state synchronization and is not exposed as a Companion command action
+
+## Presets
+
+- Ready-made buttons are organized by feature for the most common controls
+- Presets based on API resources are refreshed when applications, profiles, files, scenes, Medialists, or Titler rows change
+- Selection presets pair their action with the matching feedback whenever an observable state is available
+- Video source presets select `Source 1`–`Source 40`, `PC Input`, or `Medialist` and turn red while that same source is live
 
 ## Feedbacks
 
 ### Composer
 
 - Composer - File is currently selected file
-- Composer - Compostion is in currently selected comnposition
+- Composer - Composition is the currently selected composition
+
+### Application / Audio / Conf / Insitu / Medialist / Radio
+
+- Application Auto/Manual mode
+- Selected audio profile
+- Conf and Radio automation mode
+- Active Insitu tag and layout
+- Selected Medialist
 
 ### Scene
 
@@ -116,22 +159,21 @@ This module will communicate with Multicam Systems' Multicam Suite software.
 - Titler - Element's selected speaker row is live
 - Titler - Element's selected panel row is live
 
+### Recording / Streaming / Video
+
+- Recording active and paused
+- Streaming profile active
+- Video source live
+
+### SignalR
+
+- AssistHub connection active
+
 ## Variables
 
-- Computer Name
-- Multicam Name
-- Licensed Applications
-- Application Version
-- Running Application
-- Application Auto/Manual State
-- Application Snapshot
-- Composer - Selected File Name
-- Comnposer - Selected File ID
-- Composer - Selected Composition Name
-- Composer - Selected Composition ID
-- Scene - Selected File Name
-- Scene - Selected File ID
-- Scene - Selected Scene Name
-- Scene - Selected Scene ID
-- Titler - Selected File Name
-- Titler - Selected File ID
+Variables expose the polled and real-time state for Application, Audio, Conf, Insitu, Composer, Medialist, Publisher,
+Radio, Recording, Scenes, Streaming, Titler, Video, and media constraints. SignalR variables expose the connection state,
+last event and payload, record time, Publisher jobs, microphone and zoom state, crop zones, automation notifications,
+social-media messages, live-source changes, piloted devices, and the Assist viewed scene. JSON variables are provided for
+complex API models such as application templates, radio automation variables, Titler element structures, and media
+constraints.

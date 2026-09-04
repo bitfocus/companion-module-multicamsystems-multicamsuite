@@ -1,12 +1,144 @@
-import { CompanionFeedbackDefinitions, combineRgb } from '@companion-module/base'
+import { combineRgb } from '@companion-module/base'
+import type { CompanionFeedbackDefinitions, CompanionOptionValues } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
+
+export type FeedbacksSchema = Record<string, { type: 'boolean'; options: CompanionOptionValues }>
+
+function optionValueToString(value: unknown): string {
+	if (typeof value === 'string') return value
+	if (typeof value === 'number' || typeof value === 'boolean') return `${value}`
+	return ''
+}
 
 export function UpdateFeedbacks(self: MulticamInstance): void {
 	const COLOR_WHITE = combineRgb(255, 255, 255)
 	const COLOR_GREEN = combineRgb(0, 255, 0)
 	const COLOR_RED = combineRgb(255, 0, 0)
 
-	const feedbacks: CompanionFeedbackDefinitions = {}
+	const feedbacks: CompanionFeedbackDefinitions<FeedbacksSchema> = {}
+
+	//APPLICATION
+	feedbacks.applicationAutoMode = {
+		type: 'boolean',
+		name: 'APPLICATION | Auto/Manual mode matches',
+		description: 'Changes color when the application is in the selected automation mode.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'mode',
+				label: 'Mode',
+				default: 'Auto',
+				choices: [
+					{ id: 'Auto', label: 'Auto' },
+					{ id: 'Manual', label: 'Manual' },
+				],
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.getVariableValue('applicationAutoState') === feedback.options.mode,
+	}
+
+	feedbacks.signalrConnected = {
+		type: 'boolean',
+		name: 'SIGNALR | Hub is connected',
+		description: 'Changes color while the AssistHub SignalR connection is active.',
+		options: [],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: () => self.SIGNALR_CONNECTED,
+	}
+
+	//AUDIO
+	feedbacks.audioSelectedProfile = {
+		type: 'boolean',
+		name: 'AUDIO | Profile is selected',
+		description: 'Changes color when the chosen mixer profile is selected.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'profileId',
+				label: 'Profile',
+				default: self.CHOICES_AUDIO_PROFILES[0]?.id || '',
+				choices: self.CHOICES_AUDIO_PROFILES,
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => String(self.AUDIO_PROFILE_SELECTED?.Id ?? '') === feedback.options.profileId,
+	}
+
+	//CONF
+	feedbacks.confAutomationMode = {
+		type: 'boolean',
+		name: 'CONF | Automation mode matches',
+		description: 'Changes color when Conf is in the selected automation mode.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'mode',
+				label: 'Mode',
+				default: 'Auto',
+				choices: [
+					{ id: 'Auto', label: 'Auto' },
+					{ id: 'Wide', label: 'Wide' },
+					{ id: 'Man', label: 'Manual' },
+				],
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.CONF_STATE?.microphones?.AutomationMode === feedback.options.mode,
+	}
+
+	//INSITU
+	feedbacks.insituTagActive = {
+		type: 'boolean',
+		name: 'INSITU | Tag is active',
+		description: 'Changes color when an Insitu tag is active.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'tag',
+				label: 'Tag',
+				default: self.CHOICES_INSITU_TAGS[0]?.id || '',
+				choices: self.CHOICES_INSITU_TAGS,
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.INSITU_ACTIVE_TAGS.some((tag) => tag?.Name === feedback.options.tag),
+	}
+
+	feedbacks.insituLayoutActive = {
+		type: 'boolean',
+		name: 'INSITU | Layout is active',
+		description: 'Changes color when an Insitu layout is active.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'layout',
+				label: 'Layout',
+				default: self.CHOICES_INSITU_LAYOUTS[0]?.id || '',
+				choices: self.CHOICES_INSITU_LAYOUTS,
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.INSITU_ACTIVE_LAYOUT?.Name === feedback.options.layout,
+	}
+
+	//MEDIALIST
+	feedbacks.medialistSelected = {
+		type: 'boolean',
+		name: 'MEDIALIST | Medialist is selected',
+		description: 'Changes color when the selected Medialist matches.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'medialistId',
+				label: 'Medialist',
+				default: self.CHOICES_MEDIALISTS[0]?.id || '',
+				choices: self.CHOICES_MEDIALISTS,
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => String(self.MEDIALIST_SELECTED?.Id ?? '') === feedback.options.medialistId,
+	}
 
 	//COMPOSER
 	//file is the currently selected file
@@ -196,7 +328,7 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 			bgcolor: COLOR_GREEN,
 		},
 		callback: (feedback) => {
-			const id: string = String(feedback.options.titlerElementRowId)
+			const id = optionValueToString(feedback.options.titlerElementRowId)
 			const elementId = id.split('_speaker_')[0]
 			const rowId = id.split('_speaker_')[1]
 
@@ -229,7 +361,7 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 			bgcolor: COLOR_GREEN,
 		},
 		callback: (feedback) => {
-			const id: string = String(feedback.options.titlerElementRowId)
+			const id = optionValueToString(feedback.options.titlerElementRowId)
 			const elementId = id.split('_panel_')[0]
 			const rowId = id.split('_panel_')[1]
 
@@ -257,6 +389,37 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 		},
 	}
 
+	feedbacks.recordingPaused = {
+		type: 'boolean',
+		name: 'RECORDING | Recording is paused',
+		description: 'Changes color while the active recording is paused.',
+		options: [],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_RED },
+		callback: () => self.RECORDING_PAUSED,
+	}
+
+	//RADIO
+	feedbacks.radioAutomationMode = {
+		type: 'boolean',
+		name: 'RADIO | Automation mode matches',
+		description: 'Changes color when Radio is in the selected automation mode.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'mode',
+				label: 'Mode',
+				default: 'Auto',
+				choices: [
+					{ id: 'Auto', label: 'Auto' },
+					{ id: 'Wide', label: 'Wide' },
+					{ id: 'Man', label: 'Manual' },
+				],
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.RADIO_STATE?.microphones?.AutomationMode === feedback.options.mode,
+	}
+
 	//streaming
 	feedbacks.streaming = {
 		type: 'boolean',
@@ -278,6 +441,24 @@ export function UpdateFeedbacks(self: MulticamInstance): void {
 		callback: (feedback) => {
 			return self.ACTIVE_STREAMS.some((p) => p.id === feedback.options.streamingProfileId)
 		},
+	}
+
+	//VIDEO
+	feedbacks.videoLiveSource = {
+		type: 'boolean',
+		name: 'VIDEO | Source is live',
+		description: 'Changes color when the selected video source is live.',
+		options: [
+			{
+				type: 'dropdown',
+				id: 'source',
+				label: 'Source',
+				default: self.CHOICES_VIDEO_SOURCES[0]?.id || '',
+				choices: self.CHOICES_VIDEO_SOURCES,
+			},
+		],
+		defaultStyle: { color: COLOR_WHITE, bgcolor: COLOR_GREEN },
+		callback: (feedback) => self.VIDEO_LIVE_SOURCE === feedback.options.source,
 	}
 	self.setFeedbackDefinitions(feedbacks)
 }

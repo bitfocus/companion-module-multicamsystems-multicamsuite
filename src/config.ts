@@ -1,14 +1,17 @@
-import type { SomeCompanionConfigField } from '@companion-module/base'
+import type { JsonObject, SomeCompanionConfigField } from '@companion-module/base'
 import { Regex } from '@companion-module/base'
 
-export interface ModuleConfig {
+export interface ModuleConfig extends JsonObject {
 	host: string
 	port: number
 	specifyApiKey: boolean
-	apiKey: string
 	enablePolling: boolean
 	pollingInterval: number
 	verbose: boolean
+}
+
+export interface ModuleSecrets extends JsonObject {
+	apiKey: string
 }
 
 export function GetConfigFields(): SomeCompanionConfigField[] {
@@ -57,14 +60,15 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Specify API Key',
 			default: false,
 			width: 4,
+			disableAutoExpression: true,
 		},
 		{
-			type: 'textinput',
+			type: 'secret-text',
 			id: 'apiKey',
 			label: 'API Key',
 			width: 8,
 			default: '',
-			isVisible: (config) => !!config.specifyApiKey,
+			isVisibleExpression: '$(options:specifyApiKey)',
 		},
 		{
 			type: 'static-text',

@@ -1,82 +1,114 @@
 import { InstanceStatus } from '@companion-module/base'
 import type { MulticamInstance } from './main.js'
 import { startPolling, stopPolling } from './polling.js'
-import { initSignalR, stopSignalR } from './signalr.js'
+import { InitSignalR } from './signalr.js'
 
-const RECONNECT_INTERVAL_MS = 10000
+const CONNECTION_PROBE_TIMEOUT_MS = 2000
 
-export function clearReconnectTimer(self: MulticamInstance): void {
-	if (self.reconnectTimer) {
-		clearTimeout(self.reconnectTimer)
-		self.reconnectTimer = null
+/**
+ * Lightweight health check used by both the initial connection and the reconnect supervisor.
+ * It intentionally doesn't log failures: while Multicam is offline, the supervisor owns the
+ * status and retry messages and avoids filling Companion's log on every probe.
+ */
+export async function ProbeConnection(
+	self: MulticamInstance,
+	timeoutMs: number = CONNECTION_PROBE_TIMEOUT_MS,
+): Promise<boolean> {
+	if (!self.config.host || !self.config.port) return false
+
+	const controller = new AbortController()
+	const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+	const headers: Record<string, string> = {
+		Accept: 'application/json',
+	}
+	if (self.config.specifyApiKey && self.secrets.apiKey) {
+		headers['x-apikey'] = self.secrets.apiKey
+	}
+
+	try {
+		const response = await fetch(`http://${self.config.host}:${self.config.port}/api/application/version`, {
+			method: 'GET',
+			headers,
+			signal: controller.signal,
+		})
+		await response.text()
+		return response.ok
+	} catch (_error) {
+		return false
+	} finally {
+		clearTimeout(timeoutId)
 	}
 }
 
-export function scheduleReconnect(self: MulticamInstance, reason: string): void {
-	if (self.reconnectTimer) {
-		return
-	}
-	self.log('info', `${reason}; retrying in ${RECONNECT_INTERVAL_MS / 1000}s`)
-	self.reconnectTimer = setTimeout(() => {
-		self.reconnectTimer = null
-		void initConnection(self)
-	}, RECONNECT_INTERVAL_MS)
-}
-
-export async function stopConnection(self: MulticamInstance): Promise<void> {
-	clearReconnectTimer(self)
-	stopPolling(self)
-	await stopSignalR(self)
-}
-
-export async function initConnection(self: MulticamInstance): Promise<void> {
-	clearReconnectTimer(self)
+export async function InitConnection(self: MulticamInstance, isCurrent: () => boolean = () => true): Promise<boolean> {
+	if (!isCurrent()) return false
 	self.updateStatus(InstanceStatus.Connecting, 'Connecting...')
 
 	if (self.config.host && self.config.port) {
-		const cmd = `/api/application/version`
-
 		try {
-			const results = await Promise.race([
-				SendCommand(self, cmd),
-				timeout(2000), // 2 second timeout
-			])
+			const connected = await ProbeConnection(self)
+			if (!isCurrent()) return false
 
-			if (!results) {
+			if (!connected) {
 				self.updateStatus(InstanceStatus.ConnectionFailure, 'No response from Multicam')
 				stopPolling(self)
-				await stopSignalR(self)
-				scheduleReconnect(self, 'No response from Multicam')
-				return
+				return false
 			}
 
 			self.updateStatus(InstanceStatus.Ok)
 			self.log('info', 'Connected successfully')
 			startPolling(self)
-			initSignalR(self)
+			await InitSignalR(self)
+			return true
 		} catch (error: any) {
+			if (!isCurrent()) return false
 			self.log('error', `Connection failed: ${error.message || error}`)
 			self.updateStatus(InstanceStatus.ConnectionFailure, 'Failed to connect - check IP')
 			stopPolling(self)
-			await stopSignalR(self)
-			scheduleReconnect(self, 'Connection failed')
+			return false
 		}
-	} else {
+	} else if (isCurrent()) {
 		self.updateStatus(InstanceStatus.BadConfig, 'Missing host or port')
-		stopPolling(self)
-		await stopSignalR(self)
 	}
+	return false
 }
 
-async function timeout(ms: number): Promise<never> {
-	return new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms))
+function formatApiError(result: unknown, statusText: string): string {
+	if (typeof result !== 'object' || result === null || Array.isArray(result)) {
+		if (typeof result === 'string') return result
+		if (typeof result === 'number' || typeof result === 'boolean' || typeof result === 'bigint') return `${result}`
+		return statusText
+	}
+
+	const response = result as Record<string, unknown>
+	const errors = response.errors
+	if (typeof errors === 'object' && errors !== null && !Array.isArray(errors)) {
+		const messages = Object.entries(errors as Record<string, unknown>).flatMap(([field, value]) => {
+			const fieldMessages = Array.isArray(value) ? value : [value]
+			return fieldMessages.map((message) => {
+				if (typeof message === 'string') return `${field}: ${message}`
+				if (typeof message === 'number' || typeof message === 'boolean' || typeof message === 'bigint') {
+					return `${field}: ${message}`
+				}
+				return `${field}: ${JSON.stringify(message)}`
+			})
+		})
+		if (messages.length > 0) {
+			const title = typeof response.title === 'string' ? `${response.title} ` : ''
+			return `${title}${messages.join('; ')}`
+		}
+	}
+
+	if (typeof response.detail === 'string') return response.detail
+	if (typeof response.title === 'string') return response.title
+	return JSON.stringify(response)
 }
 
 export async function SendCommand(
 	self: MulticamInstance,
 	cmd: string,
 	method: string = 'GET',
-	payload: any = undefined,
+	payload: unknown = undefined,
 ): Promise<any> {
 	try {
 		if (self.config.host && self.config.port) {
@@ -91,9 +123,9 @@ export async function SendCommand(
 			}
 
 			//if api key is specified, add it to headers
-			if (self.config.specifyApiKey == true && self.config.apiKey) {
-				self.log('debug', `Using API Key: ${self.config.apiKey}`)
-				headers['x-apikey'] = `${self.config.apiKey}`
+			if (self.config.specifyApiKey == true && self.secrets.apiKey) {
+				self.log('debug', 'Using configured API Key')
+				headers['x-apikey'] = self.secrets.apiKey
 			} else {
 				self.log(
 					'debug',
@@ -103,9 +135,8 @@ export async function SendCommand(
 
 			let body: string | undefined = undefined
 
-			// If payload is provided, include it in the request
-			if (payload) {
-				method = 'POST' //override to POST if we have a payload
+			// If payload is provided, include it in the request without changing the requested HTTP method.
+			if (payload !== undefined) {
 				body = JSON.stringify(payload)
 			}
 
@@ -116,14 +147,24 @@ export async function SendCommand(
 			})
 
 			const contentType = response.headers.get('content-type') || ''
-
 			const raw = await response.text()
+			let result: any
 
-			if (contentType.includes('application/json')) {
-				return JSON.parse(raw)
+			if (!raw) {
+				result = undefined
+			} else if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
+				result = JSON.parse(raw)
 			} else {
-				return raw.trim()
+				result = raw.trim()
 			}
+
+			if (!response.ok) {
+				const detail = formatApiError(result, response.statusText)
+				self.log('warn', `${method} ${cmd} failed (${response.status}): ${detail}`)
+				return undefined
+			}
+
+			return result
 		} else {
 			self.log('error', 'Invalid host or port configuration')
 			return undefined
